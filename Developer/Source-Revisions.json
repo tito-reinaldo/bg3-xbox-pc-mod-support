@@ -1,0 +1,20 @@
+[
+  {
+    "Name": "bg3se",
+    "Upstream": "77e9072f1092eda7c657352ed21040f1664f3ee5",
+    "Commit": "415980445ec16d5e586e7074a0dbb4a2a4ccc8b9",
+    "Url": "https://github.com/Norbyte/bg3se"
+  },
+  {
+    "Name": "BG3ModManager",
+    "Upstream": "fc3535868935c16b7260be0d5749c0d84b2a9b1a",
+    "Commit": "f64fe2effe9f2a22c6aaefa99b79361b03114fc5",
+    "Url": "https://github.com/LaughingLeader/BG3ModManager"
+  },
+  {
+    "Name": "BG3-MCM",
+    "Upstream": "aa49f4436b4d1dd0cb9f1d3265bde8522883c653",
+    "Commit": "8a754fcb9689245ee28439034bc55bb65d11d8af",
+    "Url": "https://github.com/AtilioA/BG3-MCM"
+  }
+]

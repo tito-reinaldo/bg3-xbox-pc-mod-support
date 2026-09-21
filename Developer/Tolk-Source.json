@@ -1,0 +1,5 @@
+{
+  "Source": "https://github.com/ndarilek/tolk",
+  "Role": "Upstream source and licenses for the screen-reader adapter used by CrossSpeak. Unmodified client DLLs come from the original manager distribution.",
+  "Revision": "6d2f4301d0a1ba9b8fa6ecdd9cd65b9f9af58f32"
+}

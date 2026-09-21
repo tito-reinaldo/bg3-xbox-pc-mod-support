@@ -1,0 +1,100 @@
+[
+  {
+    "Name": "lua",
+    "Source": "https://github.com/Norbyte/lua-dos",
+    "Ref": "",
+    "Commit": "4fff4e19954f927a0478055306dadaf71bba02b2",
+    "SHA256": null
+  },
+  {
+    "Name": "Detours",
+    "Source": "https://github.com/microsoft/Detours",
+    "Ref": "v4.0.1",
+    "Commit": "e4bfd6b03e50de46b47abfbd1e46b384f0c5f833",
+    "SHA256": null
+  },
+  {
+    "Name": "imgui",
+    "Source": "https://github.com/Norbyte/imgui",
+    "Ref": "",
+    "Commit": "f0e177b80ed7525cf60fdbd552cebb7c58f8320f",
+    "SHA256": null
+  },
+  {
+    "Name": "glm",
+    "Source": "https://github.com/g-truc/glm",
+    "Ref": "1.0.3",
+    "Commit": "8d1fd52e5ab5590e2c81768ace50c72bae28f2ed",
+    "SHA256": null
+  },
+  {
+    "Name": "tinycrypt",
+    "Source": "https://github.com/intel/tinycrypt",
+    "Ref": "",
+    "Commit": "cf24c907a61c01bc2c4e1ee0ae24457c27a840a2",
+    "SHA256": null
+  },
+  {
+    "Name": "rapidjson",
+    "Source": "https://github.com/tencent/rapidjson",
+    "Ref": "24b5e7a8b27f42fa16b96fc70aade9106cf7102f",
+    "Commit": "24b5e7a8b27f42fa16b96fc70aade9106cf7102f",
+    "SHA256": null
+  },
+  {
+    "Name": "ZipLib",
+    "Source": "https://github.com/Norbyte/ZipLib",
+    "Ref": "",
+    "Commit": "144466f685633d8ce0e94cab6713025ecf125cad",
+    "SHA256": null
+  },
+  {
+    "Name": "Vulkan",
+    "Source": "https://github.com/KhronosGroup/Vulkan-Headers",
+    "Ref": "vulkan-sdk-1.4.357",
+    "Commit": "e3b1eec08173d6b825cd3ac88c885a63b621504a",
+    "SHA256": null
+  },
+  {
+    "Name": "optick",
+    "Source": "https://github.com/Norbyte/optick",
+    "Ref": "",
+    "Commit": "a84a9ac6b23a4cf4ab21ac3d98e05aa475dab34c",
+    "SHA256": null
+  },
+  {
+    "Name": "protobuf",
+    "Source": "https://github.com/protocolbuffers/protobuf",
+    "Ref": "v36.1",
+    "Commit": "f377bfefc5e2cfab68b816903c25b23e091c439d",
+    "SHA256": null
+  },
+  {
+    "Name": "curl",
+    "Source": "https://bg3se-updates.norbyte.dev/Stuff/curl.zip",
+    "Ref": null,
+    "Commit": null,
+    "SHA256": "16DC1BB708B1B94E2B932C023241A5B0C55D2E8B008B31D876CC06C4AA872742"
+  },
+  {
+    "Name": "protoc",
+    "Source": "https://github.com/protocolbuffers/protobuf/releases/download/v36.1/protoc-36.1-win64.zip",
+    "Ref": null,
+    "Commit": null,
+    "SHA256": "390E515CB456E6A978553BDB57BAF087B054885077FD6DA7F7FF0160279C07D6"
+  },
+  {
+    "Name": "SDL",
+    "Source": "https://github.com/libsdl-org/SDL/releases/download/release-2.30.6/SDL2-devel-2.30.6-VC.zip",
+    "Ref": null,
+    "Commit": null,
+    "SHA256": "65CF810EC730A127F271076EC98D4011177F6ED655D4FC8A94C0BB8DAD400922"
+  },
+  {
+    "Name": "NoesisGUI",
+    "Source": "https://bg3se-updates.norbyte.dev/Stuff/NoesisGUI-NativeSDK-win-3.1.7-Indie.zip",
+    "Ref": null,
+    "Commit": null,
+    "SHA256": "0A23696DB368DD8E9FE9CCACC628D4B168C76060BA503CF4E0EC1C0DE9528C2A"
+  }
+]

@@ -1,0 +1,2122 @@
+diff --git a/.gitignore b/.gitignore
+index ca77162..485ead4 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -347,3 +347,4 @@ TestModule/Mods/BG3Ext_Testsuite/.vscode/settings.json
+ BG3Extender/Lua.bundle
+ BG3Extender/LuaScripts/.vscode
+ BG3Extender/GameDefinitions/Generated
++MicrosoftCompatibility/CMakeLists.txt
+diff --git a/BG3Extender/BG3Extender.rc b/BG3Extender/BG3Extender.rc
+index 812bdf4036079fed39a69f5ab4a199841a2bb8b4..9cf6c5ba57b04551bcb2db4eee0f45f5e834bbb7 100644
+GIT binary patch
+delta 160
+zcmbQIenfMF9Gkl`LncESg91YeLn@HYWXJ>3DGVA6P7Ll0#tgv>t_<-Ez6_oW&I~~e
+z{y@GzgBwE#P|Tdc1PDzT3>nOTq~>I4wwb2BK>f)KMGW~2#Xy|KP=cmPkD-Dgmm!Bi
+giGhnj8E8)qP+cle=VD$6KM!a#&^4R)vOVMh00#vfQ2+n{
+
+delta 20
+ccmX@2IZu6q9NXj!wrP{kuybvG!v25<092I-7ytkO
+
+diff --git a/BG3Extender/Extender/Client/IMGUI/IMGUI.cpp b/BG3Extender/Extender/Client/IMGUI/IMGUI.cpp
+index e461055..cace382 100644
+--- a/BG3Extender/Extender/Client/IMGUI/IMGUI.cpp
++++ b/BG3Extender/Extender/Client/IMGUI/IMGUI.cpp
+@@ -1776,11 +1776,15 @@ void IMGUIObjectManager::Clear()
+ IMGUIManager::IMGUIManager(SDLManager& sdl)
+     : sdl_(sdl)
+ {
++#if defined(BG3SE_MICROSOFT_7445165)
++    renderer_ = std::make_unique<DX11Backend>(*this);
++#else
+     if (GetModuleHandleW(L"bg3_dx11.exe") == NULL) {
+         renderer_ = std::make_unique<VulkanBackend>(*this);
+     } else {
+         renderer_ = std::make_unique<DX11Backend>(*this);
+     }
++#endif
+ 
+     textureLoader_.BindRenderer(renderer_.get());
+ }
+diff --git a/BG3Extender/Extender/ScriptExtender.cpp b/BG3Extender/Extender/ScriptExtender.cpp
+index 0725e61..1d1ce06 100644
+--- a/BG3Extender/Extender/ScriptExtender.cpp
++++ b/BG3Extender/Extender/ScriptExtender.cpp
+@@ -75,13 +75,23 @@ void ScriptExtender::Initialize()
+     if (Libraries.GetGameVersion(gameVersion_)) {
+         if (gameVersion_.IsSupported()) {
+             INFO("Game version v%d.%d.%d.%d OK", gameVersion_.Major, gameVersion_.Minor, gameVersion_.Revision, gameVersion_.Build);
++#if defined(BG3SE_MICROSOFT_7445165)
++            INFO("Experimental Microsoft port: package 1.8.907.0 / SpecialBuild 7445165 identity verified");
++#endif
+         } else {
+             ERR("Game version v%d.%d.%d.%d is not supported, please upgrade!", gameVersion_.Major, gameVersion_.Minor, gameVersion_.Revision, gameVersion_.Build);
+             // Hard exit below a certain version as the EoCClient error display UI won't work anymore
++#if defined(BG3SE_MICROSOFT_7445165)
++            Fail("This experimental Script Extender requires the audited Microsoft package 1.8.907.0 / build 7445165.");
++#else
+             Fail("Script Extender doesn't support game versions below v4.68, please upgrade!");
++#endif
+         }
+     } else {
+         ERR("Failed to retrieve game version info.");
++#if defined(BG3SE_MICROSOFT_7445165)
++        Fail("Cannot verify the Microsoft game build; refusing experimental runtime initialization.");
++#endif
+     }
+ 
+     WarnIfOffline();
+diff --git a/BG3Extender/Extender/Shared/ExtensionState.cpp b/BG3Extender/Extender/Shared/ExtensionState.cpp
+index 55adda0..de2bb3e 100644
+--- a/BG3Extender/Extender/Shared/ExtensionState.cpp
++++ b/BG3Extender/Extender/Shared/ExtensionState.cpp
+@@ -55,10 +55,23 @@ namespace bg3se
+         }
+ 
+         unsigned numConfigs{ 0 };
++#if defined(BG3SE_MICROSOFT_7445165)
++        INFO("Microsoft mod discovery: side=%s manager=%p ordered=%u; offsets: clientMod=%zu serverMod=%zu ordered=%zu moduleSize=%zu directory=%zu",
++            server_ ? "server" : "client", modManager, modManager->LoadOrderedModules.size(),
++            offsetof(ecl::EoCClient, ModManager), offsetof(esv::EoCServer, ModManager),
++            offsetof(ModManager, LoadOrderedModules), sizeof(Module), offsetof(Module, Info) + offsetof(ModuleInfo, Directory));
++        {
++            auto probe = GetStaticSymbols().MakeFileReader("Mods/GeneralModdingProbe/ScriptExtender/Config.json");
++            INFO("Microsoft harmless config file probe: loaded=%d size=%zu", probe.IsLoaded(), probe.Size());
++        }
++#endif
+         for (auto const& mod : modManager->LoadOrderedModules) {
+             auto dir = mod.Info.Directory;
+             auto configFile = "Mods/" + dir + "/ScriptExtender/Config.json";
+             auto reader = GetStaticSymbols().MakeFileReader(configFile);
++#if defined(BG3SE_MICROSOFT_7445165)
++            INFO("Microsoft mod metadata: directory=%s configLoaded=%d", dir.c_str(), reader.IsLoaded());
++#endif
+ 
+             if (reader.IsLoaded()) {
+                 ExtensionModConfig config;
+diff --git a/BG3Extender/Extender/Shared/dllmain.cpp b/BG3Extender/Extender/Shared/dllmain.cpp
+index 7ac3c93..de01156 100644
+--- a/BG3Extender/Extender/Shared/dllmain.cpp
++++ b/BG3Extender/Extender/Shared/dllmain.cpp
+@@ -6,14 +6,26 @@
+ #include <sstream>
+ #include <fstream>
+ #include <Extender/Shared/ExtenderConfig.inl>
++#if defined(BG3SE_MICROSOFT_7445165)
++#include <MicrosoftCompatibility/BootstrapTrace.h>
++#endif
+ 
+ using namespace bg3se;
+ 
+ void SetupScriptExtender(HMODULE hModule)
+ {
++#if defined(BG3SE_MICROSOFT_7445165)
++    microsoft::BootstrapTrace(L"Construct ScriptExtender");
++#endif
+     gExtender = std::make_unique<ScriptExtender>();
+     auto & config = gExtender->GetConfig();
+     LoadConfig(L"ScriptExtenderSettings.json", config);
++#if defined(BG3SE_MICROSOFT_7445165)
++    microsoft::BootstrapTrace(L"Config loaded; CreateConsole", config.CreateConsole);
++    if (!config.LogDirectory.empty()) {
++        gCoreLibPlatformInterface.GlobalConsole->OpenLogFile(config.LogDirectory + L"\\EarlyRuntime-" + std::to_wstring(GetCurrentProcessId()) + L".log");
++    }
++#endif
+ 
+     // Enable console if shift is down when the game is launched
+     if (GetAsyncKeyState(VK_SHIFT) < 0) {
+@@ -30,7 +42,13 @@ void SetupScriptExtender(HMODULE hModule)
+         config.DebugFlags = DF_DebugTrace | DF_SuppressInitLog;
+     }
+ 
++#if defined(BG3SE_MICROSOFT_7445165)
++    microsoft::BootstrapTrace(L"Initialize ScriptExtender");
++#endif
+     gExtender->Initialize();
++#if defined(BG3SE_MICROSOFT_7445165)
++    microsoft::BootstrapTrace(L"Initialize returned");
++#endif
+ 
+ #if 0
+     DEBUG(" ***** ScriptExtender setup completed ***** ");
+@@ -62,10 +80,17 @@ BOOL APIENTRY DllMain( HMODULE hModule,
+     switch (ul_reason_for_call)
+     {
+     case DLL_PROCESS_ATTACH:
++#if defined(BG3SE_MICROSOFT_7445165)
++        microsoft::BootstrapTrace(L"DLL process attach");
++#endif
+         bg3se::gCoreLibPlatformInterface.ThisModule = hModule;
+         gDWriteWrapper = std::make_unique<DWriteWrapper>();
+         if (ShouldInitializeExtender()) {
+             SetupScriptExtender(hModule);
++#if defined(BG3SE_MICROSOFT_7445165)
++        } else {
++            microsoft::BootstrapTrace(L"ShouldInitializeExtender rejected", GetLastError());
++#endif
+         }
+         break;
+ 
+diff --git a/BG3Extender/GameDefinitions/FileReader.h b/BG3Extender/GameDefinitions/FileReader.h
+index 5d7914c..b347e5f 100644
+--- a/BG3Extender/GameDefinitions/FileReader.h
++++ b/BG3Extender/GameDefinitions/FileReader.h
+@@ -17,13 +17,25 @@ struct FileReader : public Noncopyable<FileReader>
+     void* DataPtr{ nullptr };
+     void* ReadPtr{ nullptr };
+     uint64_t FileSize{ 0 };
++#if defined(BG3SE_MICROSOFT_7445165)
++    uint32_t FileHandle{ 0 };
++    uint32_t FileHandle2{ 0 };
++#else
+     uint64_t FileHandle{ 0 };
+     uint64_t FileHandle2{ 0 };
++#endif
+     ScratchBuffer Buffer;
+     FileType Type{ FileType::Unknown };
+     void* FileObject{ nullptr };
+ };
+ 
++#if defined(BG3SE_MICROSOFT_7445165)
++static_assert(offsetof(FileReader, Buffer) == 0x28);
++static_assert(offsetof(FileReader, Type) == 0x80);
++static_assert(offsetof(FileReader, FileObject) == 0x88);
++static_assert(sizeof(FileReader) == 0x90);
++#endif
++
+ class FileReaderPin
+ {
+ public:
+@@ -74,4 +86,4 @@ private:
+     FileReader* reader_;
+ };
+ 
+-END_SE()
+\ No newline at end of file
++END_SE()
+diff --git a/BG3Extender/GameDefinitions/Symbols.h b/BG3Extender/GameDefinitions/Symbols.h
+index 82f4812..b92e46e 100644
+--- a/BG3Extender/GameDefinitions/Symbols.h
++++ b/BG3Extender/GameDefinitions/Symbols.h
+@@ -121,6 +121,10 @@ struct StaticSymbols : Noncopyable<StaticSymbols>
+     ls__GlobalAllocator__GetProc* ls__GlobalAllocator__Get{ nullptr };
+     ls__GlobalAllocator__AllocProc* ls__GlobalAllocator__Alloc{ nullptr };
+     ls__GlobalAllocator__FreeProc* ls__GlobalAllocator__Free{ nullptr };
++#if defined(BG3SE_MICROSOFT_7445165)
++    void (*MicrosoftAllocatorFree)(void*){ nullptr };
++    ls__GlobalAllocator__GetProc* MicrosoftAllocatorFreeGet{ nullptr };
++#endif
+ 
+     resource::GuidResourceManager** eoc__gGuidResourceManager{ nullptr };
+     ResourceManager** ls__gGlobalResourceManager{ nullptr };
+diff --git a/BG3Extender/GameHooks/BinaryMappingsMicrosoft7445165.xml b/BG3Extender/GameHooks/BinaryMappingsMicrosoft7445165.xml
+new file mode 100644
+index 0000000..9184c78
+--- /dev/null
++++ b/BG3Extender/GameHooks/BinaryMappingsMicrosoft7445165.xml
+@@ -0,0 +1,967 @@
++﻿<?xml version="1.0" encoding="UTF-8"?>
++<BinaryMappings>
++  <Mappings Version="Microsoft-1.8.907.0-7445165" Default="true">
++    <DllImport Module="Kernel32" Proc="FindFirstFileW" Symbol="Kernel_FindFirstFileW" />
++    <DllImport Module="Kernel32" Proc="FindNextFileW" Symbol="Kernel_FindNextFileW" />
++    <DllImport Module="Kernel32" Proc="FindClose" Symbol="Kernel_FindClose" />
++    <Mapping Name="MicrosoftAllocatorFreeContract" Scope="Custom">
++    40 57 48 83 ec 20 48 8b f9
++    @get e8 ?? ?? ?? ??
++    4c 8b d8 48 85 ff 74 79 48 8b d7 c7 44 24 30 ff ff ff ff
++    48 8b c8 e8 ?? ?? ?? ?? 84 c0 74 29
++    4c 8d 44 24 30 48 8b d7 e8 ?? ?? ?? ?? 84 c0 74 18
++    8b 54 24 30 49 8d 8b e8 00 00 00 4c 8b c7 48 83 c4 20 5f e9 ?? ?? ?? ??
++    <Target Type="Absolute" Offset="0" Symbol="MicrosoftAllocatorFree" /><Target Type="Indirect" Offset="@get" Symbol="MicrosoftAllocatorFreeGet" /></Mapping>
++    <Mapping Name="MicrosoftAllocatorAllocContract" Scope="Custom">
++    48 83 ec 28 48 8b c2 4c 8b c1 48 85 d2 75 05 48 83 c4 28 c3
++    48 8b 54 24 50 33 c9
++    <Target Type="Absolute" Offset="0" Symbol="ls__GlobalAllocator__Alloc" /></Mapping>
++    <Mapping Name="ls__GlobalAllocator" Critical="true">
++    4c 8b 74 24 68 48 8b 0e e8 ?? ?? ?? ?? 4c 89 26 4c 8b 64 24 60 eb 2a
++    48 8b cb
++    @free e8 ?? ?? ?? ??
++    @get e8 ?? ?? ?? ??
++    33 d2 48 c7 44 24 20 10 00 00 00 48 8b c8
++    @alloc e8 ?? ?? ?? ??
++    45 33 ff 48 89 06 44 89 7e 08
++    <!-- Pattern::Scan uses an exclusive start-position bound. The full
++         86-byte contract requires an 87-byte window to test offset zero. --><Target Type="Indirect" Offset="@free" NextSymbol="MicrosoftAllocatorFreeContract" NextSymbolSeekSize="87" /><Target Type="Indirect" Offset="@get" Symbol="ls__GlobalAllocator__Get" /><Target Type="Indirect" Offset="@alloc" NextSymbol="MicrosoftAllocatorAllocContract" NextSymbolSeekSize="32" /></Mapping>
++    <Mapping Name="ls::FixedString::IncRef" Critical="true">
++      83 f8 ff // cmp     eax, 0FFFFFFFFh
++      74 0b // jz      short loc_140EC1A4F
++      8b c8 // mov     ecx, eax; a1
++      @ref1 e8 ?? ?? ?? ?? // call    ls__FixedString__AddRef
++      8b 44 24 58 // mov     eax, [rsp+48h+a1]
++      8b 0b // mov     ecx, [rbx]
++      83 f9 ff // cmp     ecx, 0FFFFFFFFh
++      74 20 // jz      short loc_140EC1A76
++      89 4c 24 20 // mov     [rsp+48h+var_28], ecx
++      @ref2 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:ls__gGlobalStringTable
++      48 81 c1 00 c6 00 00 // add     rcx, 0C600h
++      48 8d 54 24 20 // lea     rdx, [rsp+48h+var_28]
++      @ref3 e8 ?? ?? ?? ?? // call    ls__GlobalStringTable__MainTable__DecRef
++      <Target Type="Indirect" Offset="@ref1" Symbol="ls__FixedString__IncRef" /><Target Type="Indirect" Offset="@ref2" Symbol="ls__gGlobalStringTable" /><Target Type="Indirect" Offset="@ref3" Symbol="ls__GlobalStringTable__MainTable__DecRef" /></Mapping>
++    <Mapping Name="ls::ThreadRegistry::RequestThreadIndex" Scope="Custom">
++      @ref1 e8 ?? ?? ?? ?? // call    ls__ThreadRegistry__RequestThreadIndex
++      48 63 c8 // movsxd  rcx, eax
++      48 c1 e1 06 // shl     rcx, 6
++      <Target Type="Indirect" Offset="@ref1" Symbol="ls__ThreadRegistry__RequestThreadIndex" /></Mapping>
++    <Mapping Name="ls::FixedString::CreateFromString" Critical="true">
++      @str1 48 8d 05 ?? ?? ?? ?? // lea     rax, aH14884b44gc0bc; "h14884b44gc0bcg4fe7gbd6eg40ccb7063607"
++      48 89 44 24 28 // mov     [rsp+48h+var_20], rax
++      c7 44 24 30 25 00 00 00 // mov     [rsp+48h+var_18], 25h ; '%'
++      c7 44 24 60 ff ff ff ff // mov     [rsp+48h+arg_10], 0FFFFFFFFh
++      c7 44 24 20 02 00 00 00 // mov     [rsp+48h+var_28], 2
++      48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:ls__gGlobalStringTable
++      48 81 c1 00 c6 00 00 // add     rcx, 0C600h
++      4c 8d 44 24 28 // lea     r8, [rsp+48h+var_20]
++      48 8d 54 24 58 // lea     rdx, [rsp+48h+arg_8]
++      @ref2 e8 ?? ?? ?? ?? // call    ls__GlobalStringTable__MainTable__FromString
++      <Condition Type="String" Offset="@str1" Value="h14884b44gc0bcg4fe7gbd6eg40ccb7063607" /><Target Type="Indirect" Offset="@ref2" Symbol="ls__GlobalStringTable__MainTable__CreateFromString" /><Target Type="Indirect" Offset="@ref2" NextSymbol="ls::ThreadRegistry::RequestThreadIndex" NextSymbolSeekSize="512" /></Mapping>
++    <Mapping Name="ls::FixedString::GetString" Critical="true">
++      48 8d 54 24 40 // lea     rdx, [rsp+58h+var_18]; a2
++      48 8b d8 // mov     rbx, rax
++      @ref1 e8 ?? ?? ?? ?? // call    ls__FixedString__ToString
++      0f 10 07 // movups  xmm0, xmmword ptr [rdi]
++      0f 11 05 ?? ?? ?? ?? // movups  cs:xmmword_145B17160, xmm0
++      0f 10 0b // movups  xmm1, xmmword ptr [rbx]
++      48 8b 5c 24 60 // mov     rbx, [rsp+58h+arg_0]
++      <Target Type="Indirect" Offset="@ref1" Symbol="ls__FixedString__GetString" /></Mapping>
++    <Mapping Name="ls::FileReader::ctor" Critical="true">
++  8d 53 0b
++  @str1 4c 8d 05 ?? ?? ?? ??
++  48 8d 4d 1f e8 ?? ?? ?? ?? 90 44 8b cb 45 33 c0
++  48 8d 55 1f 48 8d 4d 8f
++  @ref1 e8 ?? ?? ?? ??
++  <Condition Type="String" Offset="@str1" Value="Credits/credits.txt" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__FileReader__ctor" /></Mapping>
++    <Mapping Name="ls::FileReader::dtor" Critical="true">
++  48 89 5c 24 10 48 89 74 24 18 57 48 83 ec 20
++  48 8b b9 88 00 00 00 33 f6 48 89 71 08 48 8b d9
++  48 89 71 10 48 85 ff 74 ?? 48 8b cf e8 ?? ?? ?? ??
++  8d 56 10 48 8b cf e8 ?? ?? ?? ?? 48 89 b3 88 00 00 00
++  8b 43 24
++  <Target Type="Absolute" Offset="0" Symbol="ls__FileReader__dtor" /></Mapping>
++    <Mapping Name="ls__PathRoots" Critical="true">
++      0f b6 81 8e 00 00 00 // movzx   eax, byte ptr [rcx+8Eh]
++      24 fe // and     al, 0FEh
++      24 fd // and     al, 0FDh
++      24 fb // and     al, 0FBh
++      88 81 8e 00 00 00 // mov     [rcx+8Eh], al
++      c7 81 8f 00 00 00 04 00 00 00 // mov     dword ptr [rcx+8Fh], 4
++      48 81 c1 98 00 00 00 // add     rcx, 98h
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:cpath_Roots
++      <Target Type="Indirect" Offset="@ref1" Symbol="ls__PathRoots" /></Mapping>
++    <Mapping Name="App::UpdatePaths">
++      @ref1 e8 ?? ?? ?? ?? // call    App__UpdatePaths
++      @ref2 48 8d 15 ?? ?? ?? ?? // lea     rdx, Locale; Locale
++      33 c9 // xor     ecx, ecx; Category
++      @ref3 ff 15 ?? ?? ?? ?? // call    cs:_wsetlocale
++      b9 fc ff ff ff // mov     ecx, 0FFFFFFFCh; CodePage
++      @ref4 ff 15 ?? ?? ?? ?? // call    cs:_setmbcp
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, str_C; "C"
++      b9 04 00 00 00 // mov     ecx, 4; Category
++      <Condition Type="String" Offset="@str1" Value="C" /><Target Type="Indirect" Offset="@ref1" Symbol="App__UpdatePaths" /></Mapping>
++    <!-- Sig: reference to strings "gr2", "lsm" -->
++    <Mapping Name="EoCServer2/EoCClient2" Critical="true">
++      48 89 44 24 58 // mov     [rsp+78h+var_20], rax
++      0f b7 f2 // movzx   esi, dx
++      48 8b e9 // mov     rbp, rcx
++      45 33 ff // xor     r15d, r15d
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ecl__gEocClient
++      4c 8b b0 98 00 00 00 // mov     r14, [rax+98h]
++      @ref2 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ls__gGlobalSwitches
++      44 38 b8 11 01 00 00 // cmp     [rax+111h], r15b
++      75 ?? // jnz     short loc_1405C620C
++      @ref3 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:esv__gEocServer
++      48 8b b8 a8 00 00 00 // mov     rdi, [rax+0A8h]
++      48 8b 4f 20 // mov     rcx, [rdi+20h]
++      <Target Type="Indirect" Offset="@ref1" Symbol="ecl__EoCClient" /><Target Type="Indirect" Offset="@ref2" Symbol="ls__GlobalSwitches" /><Target Type="Indirect" Offset="@ref3" Symbol="esv__EoCServer" /></Mapping>
++    <!-- Sig: reference to strings "gr2", "lsm" -->
++    <Mapping Name="ecl::EoCClient::Update" Critical="true">
++      @ref1 48 8b 35 ?? ?? ?? ?? // mov     rdi, cs:ecl__gEocClient
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e 98 00 00 00 // mov     rcx, [rdi+98h]
++      e8 ?? ?? ?? ?? // call    sub_1417FCCA0
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e a8 01 00 00 // mov     rcx, [rdi+1A8h]
++      @ref2 e8 ?? ?? ?? ?? // call    ecs__EntityWorld__PreUpdate
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e 90 00 00 00 // mov     rcx, [rdi+90h]
++      @ref3 e8 ?? ?? ?? ?? // call    ecl__GameStateMachine__Update
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e a8 01 00 00 // mov     rcx, [rdi+1A8h]
++      @ref4 e8 ?? ?? ?? ?? // call    ecs__EntityWorld__PostUpdate
++      48 8b 8e a8 00 00 00 // mov     rcx, [rdi+0A8h]
++      48 85 c9 // test    rcx, rcx
++      74 0c // jz      short loc_140585FA5
++      48 8b 01 // mov     rax, [rcx]
++      48 8b d3 // mov     rdx, rbx
++      ff 90 f0 00 00 00 // call    qword ptr [rax+0F0h]
++      <Target Type="Indirect" Offset="@ref3" Symbol="ecl__GameStateMachine__Update" /><Target Type="Indirect" Offset="@ref4" Symbol="ecs__EntityWorld__Update" /></Mapping>
++    <Mapping Name="ecs__EntityWorld__FlushECBs">
++      48 83 be 00 03 00 00 00 // cmp     qword ptr [rsi+300h], 0
++      74 08 // jz      short loc_143693C93
++      48 8b ce // mov     rcx, rsi
++      @ref1 e8 ?? ?? ?? ?? // call    ecs__EntityWorld__FlushECBs
++      48 8b 5e 30 // mov     rbx, [rsi+30h]
++      8b 46 3c // mov     eax, [rsi+3Ch]
++      48 69 f8 f8 00 00 00 // imul    rdi, rax, 0F8h ; 'ø'
++      48 03 fb // add     rdi, rbx
++      48 3b df // cmp     rbx, rdi
++      <Target Type="Indirect" Offset="@ref1" Symbol="ecs__EntityWorld__FlushECBs" /></Mapping>
++    <!-- Sig: reference to string "MoveController" -->
++    <Mapping Name="ls__gTranslatedStringRepository" Critical="true">
++      40 53 // push    rbx
++      48 83 ec 40 // sub     rsp, 40h
++      @ref1 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:ls__gTranslatedStringRepository
++      @str1 48 8d 05 ?? ?? ?? ?? // lea     rax, aMovecontroller; "MoveController"
++      4c 8d 44 24 28 // lea     r8, [rsp+48h+var_20]
++      <Condition Type="String" Offset="@str1" Value="MoveController" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__gTranslatedStringRepository" /></Mapping>
++    <Mapping Name="ls__gTranslatedStringKeyManager">
++		41 83 7d 18 02 // cmp     dword ptr [r13+18h], 2
++		0f 85 ?? ?? 00 00 // jnz     loc_141B90E2F
++		@str1 48 8d 05 ?? ?? ?? ?? // lea     rax, aOnmap; "OnMap"
++		48 89 44 24 ?? // mov     [rsp+1F0h+var_1A0], rax
++		@ref1 4c 8b 15 ?? ?? ?? ?? // mov     r10, cs:ls__gTranslatedStringKeyManager
++		45 8b 04 24 // mov     r8d, [r12]
++		<Condition Type="String" Offset="@str1" Value="OnMap" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__gTranslatedStringKeyManager" /></Mapping>
++    <Mapping Name="ecl::EoCClient::HandleError">
++      41 b0 01 // mov     r8b, 1
++      48 8d 55 ff // lea     rdx, [rbp+57h+var_58]
++      48 8b cf // mov     rcx, rdi
++      @ref1 e8 ?? ?? ?? ?? // call    ecl__EocClient__HandleError
++      90 // nop
++      48 8d 4d d7 // lea     rcx, [rbp+57h+var_80]
++      e9 1e 01 00 00 // jmp     loc_141859EC8
++      48 c7 45 c7 05 00 00 00 // mov     [rbp+57h+var_90], 5
++      44 8b c8 // mov     r9d, eax
++      @str1 4c 8d 05 ?? ?? ?? ?? // lea     r8, a4x; "%.4x"
++      <Condition Type="String" Offset="@str1" Value="%.4x" /><Target Type="Indirect" Offset="@ref1" Symbol="ecl__EoCClient__HandleError" /></Mapping>
++    <Mapping Name="ecl__gGameStateEventManager" Critical="true">
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, aClientStateSwa; "CLIENT STATE SWAP - from: %s, to: %s"
++      48 8d 4c 24 38 // lea     rcx, [rsp+3B0h+var_378]
++      e8 ?? ?? ?? ?? // call    sub_1438650C0
++      45 84 f6 // test    r14b, r14b
++      74 00 // jz      short $+2
++      44 89 6d b0 // mov     dword ptr [rbp+2B0h+var_300], r13d
++      8b 47 08 // mov     eax, [rdi+8]
++      89 45 b4 // mov     dword ptr [rbp+2B0h+var_300+4], eax
++      @ref2 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ecl__gGameStateEventManager
++      <Condition Type="String" Offset="@str1" Value="CLIENT STATE SWAP - from: %s, to: %s" /><Target Type="Indirect" Offset="@ref2" Symbol="ecl__gGameStateEventManager" /></Mapping>
++    <Mapping Name="esv__gGameStateEventManager" Critical="true">
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, aServerStateSwa; "SERVER STATE SWAP - from: %s, to: %s\n"
++      48 8d 4c 24 30 // lea     rcx, [rsp+98h+var_68]
++      e8 ?? ?? ?? ?? // call    sub_1438650C0
++      40 84 ed // test    bpl, bpl
++      74 00 // jz      short $+2
++      44 89 a4 24 a0 00 00 00 // mov     [rsp+98h+arg_0], r12d
++      8b 47 10 // mov     eax, [rdi+10h]
++      89 84 24 a4 00 00 00 // mov     [rsp+98h+arg_4], eax
++      @ref2 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:esv__gGameStateEventManager
++      <Condition Type="String" Offset="@str1" Value="SERVER STATE SWAP - from: %s, to: %s&#xA;" /><Target Type="Indirect" Offset="@ref2" Symbol="esv__gGameStateEventManager" /></Mapping>
++    <Mapping Name="esv::GameStateMachine::Update" Critical="true">
++      48 89 03 // mov     [rbx], rax
++      48 8b d3 // mov     rdx, rbx
++      48 8b ce // mov     rcx, rsi
++      e8 ?? ?? ?? ?? // call    esv__GameStateMachine__SetTargetState
++      48 8d 15 ?? ?? ?? ?? // lea     rdx, unk_145C9A298
++      48 8b 8f a0 00 00 00 // mov     rcx, [rdi+0A0h]
++      @ref3 e8 ?? ?? ?? ?? // call    esv__GameStateMachine__Update
++      8b 05 ?? ?? ?? ?? // mov     eax, cs:ls__AnimationBlueprintSystemID
++      48 69 d0 f8 00 00 00 // imul    rdx, rax, 0F8h
++      <Target Type="Indirect" Offset="@ref3" Symbol="esv__GameStateMachine__Update" /></Mapping>
++    <Mapping Name="App::LoadGraphicSettings" Critical="true">
++      48 89 5c 24 10 // mov     [rsp+arg_8], rbx
++      57 // push    rdi
++      48 83 ec 40 // sub     rsp, 60h
++      48 8b 05 ?? ?? ?? ?? // mov     rax, cs:__security_cookie
++      48 33 c4 // xor     rax, rsp
++      48 89 44 24 38 // mov     [rsp+68h+var_10], rax
++      48 8b f9 // mov     rdi, rcx
++      ba 04 00 00 00 // mov     edx, 4
++      @str1 4c 8d 05 ?? ?? ?? ?? // lea     r8, aGraphicsetting_0; "graphicSettings.lsx"
++      <Condition Type="String" Offset="@str1" Value="graphicSettings.lsx" /><Target Type="Absolute" Offset="0" Symbol="App__LoadGraphicSettings" /></Mapping>
++    <Mapping Name="ls::gInputManager">
++  84 d2 74 1f
++  @str1 48 8d 05 ?? ?? ?? ??
++  c7 44 24 38 2e 00 00 00 48 89 44 24 30
++  0f 28 44 24 30 66 0f 7f 44 24 30
++  @ref1 48 8b 3d ?? ?? ?? ??
++  33 d2 48 8b cf e8 ?? ?? ?? ??
++  33 d2 48 8b ce e8 ?? ?? ?? ??
++  ba 01 00 00 00 4c 8d 44 24 30 48 8d 4c 24 40
++  <Condition Type="String" Offset="@str1" Value="PlayerProfiles/Eoc/controller_WhiteBoxing.json" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__gInputManager" /></Mapping>
++    <!-- Sig: Ref to esv::platform::MovementSystemID -->
++    <Mapping Name="esv::GameStateThreaded::GameStateWorker::DoWork" Critical="true">
++      48 8b c4 // mov     rax, rsp
++      55 // push    rbp
++      53 // push    rbx
++      56 // push    rsi
++      57 // push    rdi
++      41 54 // push    r12
++      41 56 // push    r14
++      41 57 // push    r15
++      48 8d a8 68 fb ff ff // lea     rbp, [rax-498h]
++      48 81 ec 60 05 00 00 // sub     rsp, 560h
++      0f 29 70 b8 // movaps  xmmword ptr [rax-48h], xmm6
++      0f 29 78 a8 // movaps  xmmword ptr [rax-58h], xmm7
++      48 8b f1 // mov     rsi, rcx
++      48 8b 99 e8 00 00 00 // mov     rbx, [rcx+0E8h]
++      @ref1 ff 15 ?? ?? ?? ?? // call    cs:GetCurrentThreadId
++      <Target Type="Absolute" Offset="0" Symbol="esv__GameStateThreaded__GameStateWorker__DoWork" /></Mapping>
++    <Mapping Name="ecl::GameStateThreaded::GameStateWorker::DoWork" Scope="Custom" Critical="true">
++      48 8b c4 // mov     rax, rsp
++      48 89 70 10 // mov     [rax+10h], rsi
++      48 89 78 18 // mov     [rax+18h], rdi
++      <Target Type="Absolute" Offset="0" Symbol="ecl__GameStateThreaded__GameStateWorker__DoWork" /></Mapping>
++    <Mapping Name="ecl::GameStateThreaded::GameStateWorker::DoWork - Outer" Critical="true">
++      4C 8D 3D ?? ?? ?? ?? // lea     rbp, aEclGamestateth ; "ecl::GameStateThreaded::GameStateWorker::DoWork"
++      <Condition Type="String" Offset="0" Value="ecl::GameStateThreaded::GameStateWorker::DoWork" /><Target Type="Absolute" Offset="-80" NextSymbol="ecl::GameStateThreaded::GameStateWorker::DoWork" NextSymbolSeekSize="80" /></Mapping>
++    <Mapping Name="ls::ModuleSettings::IsModded" AllowFail="true">
++      @str 3B 05 ?? ?? ?? ?? // cmp     eax, cs:dword_145E0D6FC
++      74 05 // jz      short loc_1439AEB6F
++      @ref 40 b7 01 // mov     dil, 1
++      eb 03 // jmp     short loc_1439AEB72
++      40 32 ff // xor     dil, dil
++      83 f8 ff // cmp     eax, 0FFFFFFFFh
++      <Condition Type="FixedString" Offset="@str" Value="d65cf1b6-23a8-f0db-0a56-4b479a559748" /><Patch Type="Absolute" Offset="@ref">
++        40 32 ff
++      </Patch></Mapping>
++    <!-- Needed to ensure that savegame loader doesn't convert warnings to errors in "unmodded" saves -->
++    <Mapping Name="esv::SavegameManager::ThrowError" AllowFail="true">
++      48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:esv__gEocServer
++      48 81 c1 08 01 00 00 // add     rcx, 108h
++      48 8d 54 24 20 // lea     rdx, [rsp+48h+var_28]
++      e8 ?? ?? ?? ?? // call    sub_143AD8280
++      90 // nop
++      84 db // test    bl, bl
++      75 0e // jnz     short loc_142A23756
++      48 8d 4c 24 20 // lea     rcx, [rsp+48h+var_28]
++      e8 ?? ?? ?? ?? // call    ls__ModuleSettings__HasCustomMods
++      84 c0 // test    al, al
++      @ref 74 03 // jz      short loc_142A23759
++      <Patch Type="Absolute" Offset="@ref">
++        66 90
++      </Patch></Mapping>
++    <Mapping Name="esv::spell_cast::UnitTestHelper::ExecuteStatsFunctors">
++      41 8b 40 08 // mov     eax, [r8+8]
++      ff c8 // dec     eax; switch 9 cases
++      83 f8 08 // cmp     eax, 8
++      0f 87 ?? ?? ?? ?? // ja      def_1433D35CC; jumptable 00000001433D35CC default case
++      48 63 c8 // movsxd  rcx, eax
++      48 8d 05 ?? ?? ?? ?? // lea     rax, __ImageBase
++      44 8b 8c 88 ?? ?? ?? ?? // mov     r9d, ds:(jpt_1433D35CC - 140000000h)[rax+rcx*4]
++      4c 03 c8 // add     r9, rax
++      41 ff e1 // jmp     r9; switch jump
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 1
++      48 8b ce // mov     rcx, r14
++      @ref2 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_AttackTargetContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 2
++      48 8b ce // mov     rcx, r14
++      @ref3 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_AttackPositionContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 3
++      48 8b ce // mov     rcx, r14
++      @ref4 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_MoveContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 4
++      48 8b ce // mov     rcx, r14
++      @ref5 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_TargetContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 5
++      48 8b ce // mov     rcx, r14
++      @ref6 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_NearbyAttackedContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 6
++      48 8b ce // mov     rcx, r14
++      @ref7 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_NearbyAttackingContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 7
++      48 8b ce // mov     rcx, r14
++      @ref8 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_EquipContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      49 8b d2 // mov     rdx, r10; jumptable 00000001433D35CC case 8
++      48 8b ce // mov     rcx, r14
++      @ref9 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_SourceContext
++      90 // nop
++      e9 ?? ?? 00 00 // jmp     loc_1433D39F0
++      4d 8b c8 // mov     r9, r8; jumptable 00000001433D35CC case 9
++      4d 8b c2 // mov     r8, r10
++      49 8b 13 // mov     rdx, [r11]
++      48 8b ce // mov     rcx, r14
++      @ref10 e8 ?? ?? ?? ?? // call    esv__ExecuteStatsFunctor_InterruptContext
++      <Target Type="Indirect" Offset="@ref2" Symbol="esv__ExecuteStatsFunctor_AttackTargetContext" /><Target Type="Indirect" Offset="@ref3" Symbol="esv__ExecuteStatsFunctor_AttackPositionContext" /><Target Type="Indirect" Offset="@ref4" Symbol="esv__ExecuteStatsFunctor_MoveContext" /><Target Type="Indirect" Offset="@ref5" Symbol="esv__ExecuteStatsFunctor_TargetContext" /><Target Type="Indirect" Offset="@ref6" Symbol="esv__ExecuteStatsFunctor_NearbyAttackedContext" /><Target Type="Indirect" Offset="@ref7" Symbol="esv__ExecuteStatsFunctor_NearbyAttackingContext" /><Target Type="Indirect" Offset="@ref8" Symbol="esv__ExecuteStatsFunctor_EquipContext" /><Target Type="Indirect" Offset="@ref9" Symbol="esv__ExecuteStatsFunctor_SourceContext" /><Target Type="Indirect" Offset="@ref10" Symbol="esv__ExecuteStatsFunctor_InterruptContext" /></Mapping>
++    <!-- Sig: call from DealDamageFunctor::ApplyDamage, near ref to PassiveSystemID -->
++    <Mapping Name="esv::StatsSystem::ThrowDamageEvent">
++  88 44 24 20
++  4c 8d 8d 60 09 00 00
++  4c 8d 85 70 05 00 00
++  48 8d 95 50 02 00 00
++  48 8b 8d 98 00 00 00
++  @ref1 e8 ?? ?? ?? ??
++  80 bd 76 05 00 00 0a
++  0f 84 3a 02 00 00
++  83 bd 70 05 00 00 00
++  41 0f 9f c4
++  <Target Type="Indirect" Offset="@ref1" Symbol="esv__StatsSystem__ThrowDamageEvent" /></Mapping>
++    <!-- Sig: call from osi::ApplyDamage -->
++    <Mapping Name="eoc::DealDamageFunctor::ApplyDamage">
++      48 8d 4d a0 // lea     rcx, [rbp+70h+var_D0]
++      48 89 4c 24 30 // mov     [rsp+180h+var_150], rcx
++      88 44 24 28 // mov     [rsp+180h+var_158], al
++      4c 89 7c 24 20 // mov     [rsp+180h+var_160], r15
++      4d 8b cc // mov     r9, r12
++      4d 8b c5 // mov     r8, r13
++      48 8b 5d 80 // mov     rdi, [rbp+70h+var_F0]
++      48 8b d3 // mov     rdx, rdi
++      48 8b 7d 90 // mov     rbx, [rbp+70h+var_E0]
++      48 8b cf // mov     rcx, rbx
++      @ref1 e8 ?? ?? ?? ?? // call    esv__functor__StatsFunctorDealDamage__Execute
++      90 // nop
++      8b 45 d0 // mov     eax, [rbp+70h+var_A0]
++      83 f8 ff // cmp     eax, 0FFFFFFFFh
++      <Target Type="Indirect" Offset="@ref1" Symbol="stats__DealDamageFunctor__ApplyDamage" /></Mapping>
++    <Mapping Name="App::Instance">
++      @str1 48 8d 0d ?? ?? ?? ?? // lea     rcx, aCreatingApp; "Creating App\n"
++      ff 15 ?? ?? ?? ?? // call    cs:OutputDebugStringA
++      b9 ?? ?? 00 00 // mov     ecx, 218h; Size
++      ff 15 ?? ?? ?? ?? // call    cs:__imp_malloc
++      4c 8b f0 // mov     r12, rax
++      @ref1 48 89 05 ?? ?? ?? ?? // mov     cs:ls__gApp2, rax
++      48 8b c8 // mov     rcx, rax
++      @ref2 e8 ?? ?? ?? ?? // call    App__ctor
++      <Condition Type="String" Offset="@str1" Value="Creating App&#xA;" /><Target Type="Indirect" Offset="@ref1" Symbol="AppInstance" /><Target Type="Indirect" Offset="@ref2" Symbol="App__Ctor" /></Mapping>
++    <Mapping Name="esv::SavegameManager">
++      <Target Type="Indirect" Offset="18" Symbol="esv__SavegameManager" />
++      48 89 03 // mov     [rbx], rax
++      4C 8B CB // mov     r9, rbx
++      44 8B 05 ?? ?? ?? ?? // mov     r8d, cs:esv__SurfaceActionIndex
++      BA 15 00 00 00 // mov     edx, 15h
++      48 8B 0D ?? ?? ?? ?? // mov     rcx, cs:esv__gSavegameManager
++      E8 ?? ?? ?? ?? // call    esv__SavegameManager__RegisterFactory
++      90 // nop
++    </Mapping>
++    <Mapping Name="stats::Object::SetPropertyString">
++      @str1 3b 05 ?? ?? ?? ?? // cmp     eax, cs:fs_ComboCategory
++      75 32 // jnz     short loc_140ED8E0C
++      48 89 4c 24 48 // mov     [rsp+211D0h+var_21188], rcx
++      48 8d 85 84 1f 00 00 // lea     rax, [rbp+210D0h+var_1F14C]
++      48 c7 c2 ff ff ff ff // mov     rdx, 0FFFFFFFFFFFFFFFFh
++      0f 1f 00 // nop     dword ptr [rax]
++      48 ff c2 // inc     rdx
++      80 3c 10 00 // cmp     byte ptr [rax+rdx], 0
++      75 f7 // jnz     short loc_140ED8DF0
++      4c 8d 4c 24 48 // lea     r9, [rsp+211D0h+var_21188]
++      48 8d 8d 84 1f 00 00 // lea     rcx, [rbp+210D0h+var_1F14C]
++      e8 ?? ?? ?? ?? // call    stats__Object__SetFixedString
++      eb 12 // jmp     short loc_140ED8E1E
++      4c 8d 85 84 1f 00 00 // lea     r8, [rbp+210D0h+var_1F14C]
++      48 8d 54 24 34 // lea     rdx, [rsp+211D0h+var_2119C]
++      @ref3 e8 ?? ?? ?? ?? // call    stats__Object__SetPropertyString
++      <Condition Type="FixedString" Offset="@str1" Value="ComboCategory" /><Target Type="Indirect" Offset="@ref3" Symbol="stats__Object__SetPropertyString" /></Mapping>
++    <!-- NOTE: Adjust LibraryManager::BindECSContext after changing this -->
++    <Mapping Name="ecs::StaticContextRegistrant" AllowFail="true">
++      @ref1 0f 11 05 ?? ?? ?? ?? // movups  cs:xmmword_145B2D7A0, xmm0
++      48 8d 05 ?? ?? ?? ?? // lea     rax, ls__ComponentIdInitTemp2
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145B2D798, rax
++      48 8d 05 ?? ?? ?? ?? // lea     rax, qword_145BB7478
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145B2D790, rax
++      48 8b 05 ?? ?? ?? ?? // mov     rax, cs:qword_145BB28B0
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145B2D7B0, rax
++      48 8d 05 ?? ?? ?? ?? // lea     rax, qword_145B2D790
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145BB28B0, rax
++      48 8b 5c 24 40 // mov     rbx, [rsp+38h+arg_0]
++      48 83 c4 30 // add     rsp, 30h
++      5f // pop     rdi
++      c3 // retn
++      48 8d 0d ?? ?? ?? ?? // lea     rcx, dword_145BB5A70
++      e8 ?? ?? ?? ?? // call    _Init_thread_header
++      83 3d ?? ?? ?? ?? ff // cmp     cs:dword_145BB5A70, 0FFFFFFFFh
++      0f 85 7a ff ff ff // jnz     loc_14002E90A
++      @str1 48 8d 05 ?? ?? ?? ?? // lea     rax, aClassLsStringv_1; "class ls::_StringView...
++      <Target Type="Absolute" Offset="@ref1" EngineCallback="BindECSContext" /></Mapping>
++    <!-- NOTE: Adjust LibraryManager::BindECSIndex after changing this -->
++    <Mapping Name="ecs::StaticIDRegistrant" AllowFail="true">
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ecs__EntityWorld__SystemsContext
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145B2D018, rax
++      48 8d 05 ?? ?? ?? ?? // lea     rax, qword_145B2D000
++      48 89 05 ?? ?? ?? ?? // mov     cs:ecs__EntityWorld__SystemsContext, rax
++      c7 05 ?? ?? ?? ?? ff ff ff 7f // mov     cs:ls__InstancingSystemID, 7FFFFFFFh
++      48 8b 5c 24 40 // mov     rbx, [rsp+38h+arg_0]
++      48 83 c4 30 // add     rsp, 30h
++      5f // pop     rdi
++      c3 // retn
++      48 8d 0d ?? ?? ?? ?? // lea     rcx, dword_145BB51D0
++      e8 ?? ?? ?? ?? // call    _Init_thread_header
++      83 3d ?? ?? ?? ?? ff // cmp     cs:dword_145BB51D0, 0FFFFFFFFh
++      75 90 // jnz     short loc_14002F0A8
++      @str1 48 8d 05 ?? ?? ?? ?? // lea     rax, aClassLsStringv_7; "class ls::_StringView
++      <Target Type="Absolute" Offset="@ref1" EngineCallback="BindECSIndex" /></Mapping>
++    <!-- NOTE: Adjust LibraryManager::BindECSStaticStringConstructor after changing this -->
++    <Mapping Name="ecs::StaticStringConstructor" AllowFail="true">
++      @ref1 83 3d ?? ?? ?? ?? ff // cmp     cs:dword_145C08178, 0FFFFFFFFh
++      75 c2 // jnz     short loc_141463440
++      48 8d 05 ?? ?? ?? ?? // lea     rax, aClassLsStringv_4229; "class ls::_StringView...
++      48 89 44 24 20 // mov     qword ptr [rsp+38h+var_18], rax
++      c7 44 24 28 ?? ?? 00 00 // mov     dword ptr [rsp+38h+var_18+8], 6Ch ; 'l'
++      0f 28 44 24 20 // movaps  xmm0, [rsp+38h+var_18]
++      66 0f 7f 44 24 20 // movdqa  [rsp+38h+var_18], xmm0
++      48 8d 54 24 20 // lea     rdx, [rsp+38h+var_18]
++      48 8b cb // mov     rcx, rbx; Src
++      e8 ?? ?? ?? ?? // call    ls__ComponentNameFromSymbolName
++      48 8d 0d ?? ?? ?? ?? // lea     rcx, sub_144BF5630; void (__cdecl *)()
++      e8 ?? ?? ?? ?? // call    atexit
++      90 // nop
++      <Target Type="Absolute" Offset="@ref1" EngineCallback="BindECSStaticStringConstructor" /></Mapping>
++    <!-- NOTE: Adjust LibraryManager::BindECSStaticRegistrant after changing this -->
++    <Mapping Name="ecs::StaticIDRegistrant2" AllowFail="true">
++      @ref1 48 8d 05 ?? ?? ?? ?? // lea     rax, ls__model__game__inventory__v0__WieldedComponentID2
++      48 8d 4c 24 20 // lea     rcx, [rsp+38h+var_18]
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145B6FA28, rax
++      e8 ?? ?? ?? ?? // call    ls__SV__ls__model__game__inventory__v0__WieldedComponent
++      0f 10 00 // movups  xmm0, xmmword ptr [rax]
++      48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ls__model__TypeIdContext
++      48 89 05 ?? ?? ?? ?? // mov     cs:qword_145B6FA40, rax
++      48 8d 05 ?? ?? ?? ?? // lea     rax, qword_145B6FA28
++      48 89 05 ?? ?? ?? ?? // mov     cs:ls__model__TypeIdContext, rax
++      0f 11 05 ?? ?? ?? ?? // movups  cs:xmmword_145B6FA30, xmm0
++      c7 05 ?? ?? ?? ?? ff ff ff 7f // mov     cs:ls__model__game__inventory__v0__WieldedComponentID2, 7FFFFFFFh
++      48 83 c4 38 // add     rsp, 38h
++      c3 // retn
++      <Target Type="Absolute" Offset="@ref1" EngineCallback="BindECSStaticRegistrant" /></Mapping>
++    <!-- NOTE: Adjust LibraryManager::BindComponentReplicationIDRef after changing this -->
++    <Mapping Name="ecs::ComponentReplicationIDRef" AllowFail="true">
++      @ref1 48 89 05 ?? ?? ?? ?? // mov     cs:ecs__sync__ReplicatedTypeContext, rax
++      c7 05 ?? ?? ?? ?? ff ff ff 7f // mov     cs:eoc__summon__ContainerComponentID, 7FFFFFFFh
++      48 8b 5c 24 40 // mov     rbx, [rsp+38h+arg_0]
++      48 83 c4 30 // add     rsp, 30h
++      5f // pop     rdi
++      c3 // retn
++      48 8d 0d ?? ?? ?? ?? // lea     rcx, dword_145BB9C48
++      @ref3 e8 ?? ?? ?? ?? // call    _Init_thread_header
++      83 3d ?? ?? ?? ?? ff // cmp     cs:dword_145BB9C48, 0FFFFFFFFh
++      75 90 // jnz     short loc_14004DF58
++      @str1 48 8d 05 ?? ?? ?? ?? // lea     rax, aClassLsStringv_309; "class ls::_StringView
++      <Target Type="Absolute" Offset="@ref1" EngineCallback="BindComponentReplicationIDRef" /></Mapping>
++    <Mapping Name="KillLauncher" AllowFail="true">
++      b9 dc 95 10 00 // mov     ecx, 1095DCh
++      @ref1 ff 15 ?? ?? ?? ?? // call    cs:SteamAPI_RestartAppIfNecessary
++      84 c0 // test    al, al
++      74 09 // jz      short loc_141187B18
++      33 c9 // xor     ecx, ecx; Code
++      @ref2 ff 15 ?? ?? ?? ?? // call    cs:__imp_exit
++      cc // align 8
++      <Patch Type="Absolute" Offset="@ref1">
++        90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
++      </Patch></Mapping>
++    <!--
++
++
++        <Mapping Name="esv::SurfaceActionFactory::AddSurfaceAction" Scope="Custom">
++            <Target Type="Indirect" Offset="6" Symbol="esv__SurfaceManager__AddAction" />
++            49 8B D6 //  mov     rdx, r14
++            48 8B C8 // mov     rcx, rax
++            E8 ?? ?? ?? ?? // call    esv__SurfaceActionFactory__AddSurfaceAction
++            88 5E 08 // mov     [rsi+8], bl
++        </Mapping>
++
++        <Mapping Name="esv::SurfaceActionFactory">
++            <Target Type="Absolute" Offset="0" NextSymbol="esv::SurfaceActionFactory::AddSurfaceAction" NextSymbolSeekSize="768" />
++            <Target Type="Indirect" Offset="0" Symbol="esv__SurfaceActionFactory" />
++            <Target Type="Indirect" Offset="27" Symbol="esv__SurfaceActionFactory__CreateAction" />
++            48 8B 0D ?? ?? ?? ?? // mov     rcx, cs:esv__gSurfaceActionFactory
++            48 BB 00 00 00 00 00 00 C0 FF // mov     rbx, 0FFC0000000000000h
++            44 8B C0 // mov     r8d, eax
++            48 89 5C 24 20 // mov     [rsp+60h+var_40], rbx
++            B2 01 // mov     dl, 1
++            E8 ?? ?? ?? ?? // call    esv__SurfaceActionFactory__CreateSurfaceAction
++        </Mapping>
++
++        <Mapping Name="eoc::gResourceManager">
++            <Condition Type="String" Offset="0" Value="Loading Sound" />
++            <Target Type="Indirect" Offset="18" Symbol="ResourceMgr" />
++            4C 8D 05 ?? ?? ?? ?? // lea     r8, aLoadingSound ; "Loading Sound"
++            BA 01 00 00 00 // mov     edx, 1
++            49 8B CF // mov     rcx, r15
++            41 FF D1 // call    r9
++            48 8B 15 ?? ?? ?? ?? // mov     rdx, cs:eoc__gResourceManager
++        </Mapping>
++        -->
++    <Mapping Name="ls::AppliedMaterial::TryOverrideTexture2DParameter">
++      3b 08 // cmp     ecx, [rax]
++      75 29 // jnz     short loc_141D36326
++      4c 8b c6 // mov     r8, rsi
++      @str1 48 8b 15 ?? ?? ?? ?? // mov     rdx, cs:fs_NM
++      49 8b ce // mov     rcx, r14
++      @ref2 e8 ?? ?? ?? ?? // call    ls__AppliedMaterial__TryOverrideTexture2DParameter
++      4c 8b c6 // mov     r8, rsi
++      <Condition Type="FixedStringIndirect" Offset="@str1" Value="NM" /><Target Type="Indirect" Offset="@ref2" Symbol="ls__AppliedMaterial__TryOverrideTexture2DParameter" /></Mapping>
++    <Mapping Name="ls::AppliedMaterial::LoadVirtualTexture">
++      48 89 5c 24 20 // mov     [rsp+arg_18], rbx
++      48 89 4c 24 08 // mov     [rsp+arg_0], rcx
++      57 // push    rdi
++      48 83 ec 20 // sub     rsp, 20h
++      65 48 8b 04 25 58 00 00 00 // mov     rax, gs:58h
++      48 8b 3d ?? ?? ?? ?? // mov     rdi, cs:ls__gGlobalResourceManager
++      41 b8 d8 05 00 00 // mov     r8d, 5D8h
++      48 8b 08 // mov     rcx, [rax]
++      49 0f be 04 08 // movsx   rax, byte ptr [r8+rcx]                                                                           |
++      <Target Type="Absolute" Offset="0" Symbol="ls__AppliedMaterial__LoadVirtualTexture" /></Mapping>
++    <Mapping Name="ls::AppliedMaterial::LoadTexture">
++      48 89 5c 24 10              // mov qword ptr ss:[rsp+10],rbx                                                                             |
++      48 89 4c 24 08              // mov qword ptr ss:[rsp+8],rcx                                                                              | rcx:__wine_unixlib_handle+930
++      57                          // push rdi                                                                                                  |
++      48 83 ec 40                 // sub rsp,40                                                                                                |
++      65 48 8b 04 25 58 00 00 00  // mov rax,qword ptr gs:[58]                                                                                 |
++      48 8b 3d ?? ?? ?? ??        // mov rdi,qword ptr ds:[ls__gGlobalResourceManager]                                                                          |
++      41 b8 d8 05 00 00           // mov r8d,5D8                                                                                               |
++      <Target Type="Absolute" Offset="0" Symbol="ls__AppliedMaterial__LoadTexture" /></Mapping>
++    <Mapping Name="ls::TextureManager::UnloadTexture">
++      40 53                 // push rbx                                                                                                  |
++      57                    // push rdi                                                                                                  |
++      41 56                 // push r14                                                                                                  |
++      41 57                 // push r15                                                                                                  |
++      48 83 EC 58           // sub rsp,58                                                                                                |
++      48 8B 05 ?? ?? ?? ??  // mov rax,qword ptr ds:[__security_cookie]                                                                          |
++      48 33 C4              // xor rax,rsp                                                                                               |
++      48 89 44 24 40        // mov qword ptr ss:[rsp+40],rax                                                                             |
++      <Target Type="Absolute" Offset="0" Symbol="ls__TextureManager__UnloadTexture" /></Mapping>
++    <Mapping Name="eoc::gResourceManager">
++      4c 8b 1c 0a // mov     r11, [rdx+rcx]
++      4c 8b d5 // mov     r10, rbp
++      @ref1 4c 8b 0d ?? ?? ?? ?? // mov     r9, cs:ls__gGlobalResourceManager
++      33 d2 // xor     edx, edx
++      @str1 8b 0d ?? ?? ?? ?? // mov     ecx, cs:fs_lsbs.ID
++      8b c1 // mov     eax, ecx
++      <Condition Type="FixedString" Offset="@str1" Value="lsbs" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__gGlobalResourceManager" /></Mapping>
++    <Mapping Name="eoc::gGuidResourceManager">
++      48 83 ec 20 // sub     rsp, 20h
++      @ref1 48 8b 3d ?? ?? ?? ?? // mov     rdi, cs:ls__gGuidResourceManager
++      48 8b f1 // mov     rsi, rcx
++      48 8b cf // mov     rcx, rdi
++      e8 ?? ?? ?? ?? // call    sub_140EC42E0
++      4c 8b d0 // mov     r10, rax
++      4c 8d 0d ?? ?? ?? ?? // lea     r9, xmmword_145B288E0
++      44 8b 98 ac 00 00 00 // mov     r11d, [rax+0ACh]
++      45 85 db // test    r11d, r11d
++      74 3c // jz      short loc_140EDF433
++      @str1 44 8b 05 ?? ?? ?? ?? // mov     r8d, cs:fs_MALE.ID
++      <Target Type="Indirect" Offset="@ref1" Symbol="eoc__gGuidResourceManager" /><Condition Type="FixedString" Offset="@str1" Value="MALE" /></Mapping>
++    <Mapping Name="esv::LevelManager">
++      48 89 54 24 40 // mov     qword ptr [rsp+0D8h+a2.ID], rdx
++      49 8b 0c 24 // mov     rcx, [r12]
++      e8 ?? ?? ?? ?? // call    sub_140A7A5F0
++      @ref1 4c 8b 15 ?? ?? ?? ?? // mov     r10, cs:esv__gLevelManager
++      48 8d 50 0c // lea     rdx, [rax+0Ch]
++      c6 44 24 28 01 // mov     [rsp+0D8h+var_B0], 1
++      4c 89 54 24 20 // mov     [rsp+0D8h+var_B8], r10
++      @ref2 4c 8b 0d ?? ?? ?? ?? // mov     r9, cs:esv__gLocalTemplateManager
++      @ref3 4c 8b 05 ?? ?? ?? ?? // mov     r8, cs:esv__gGlobalTemplateManager
++      0f b6 48 08 // movzx   ecx, byte ptr [rax+8]
++      @ref4 e8 ?? ?? ?? ?? // call    esv__DoResolveRootTemplate
++      48 8b f8 // mov     rdi, rax
++      c7 44 24 74 ff ff ff ff // mov     [rsp+0D8h+var_64], 0FFFFFFFFh
++      <Target Type="Indirect" Offset="@ref1" Symbol="esv__LevelManager" /><Target Type="Indirect" Offset="@ref2" Symbol="esv__CacheTemplateManager" /><Target Type="Indirect" Offset="@ref3" Symbol="ls__GlobalTemplateManager" /></Mapping>
++    <Mapping Name="ecl::LevelManager">
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ecl__gLevelManager
++      48 8b b8 90 00 00 00 // mov     rdi, [rax+90h]
++      48 85 ff // test    rdi, rdi
++      0f 84 ?? ?? ?? ?? // jz      loc_14161334B
++      48 8b 05 ?? ?? ?? ?? // mov     rax, cs:qword_145FEABB8
++      48 85 c0 // test    rax, rax
++      75 21 // jnz     short loc_1416131EE
++      4c 8d 05 ?? ?? ?? ?? // lea     r8, sub_1413F71D0
++      48 8d 15 ?? ?? ?? ?? // lea     rdx, sub_14117A260
++      @str1 48 8d 0d ?? ?? ?? ?? // lea     rcx, aLsMapmarker; "ls.MapMarker"
++      <Condition Type="String" Offset="@str1" Value="ls.MapMarker" /><Target Type="Indirect" Offset="@ref1" Symbol="ecl__LevelManager" /></Mapping>
++    <Mapping Name="ls__TextureAtlasMap">
++      e8 ?? ?? ?? ?? // call    sub_143AE3050
++      48 8b 43 18 // mov     rax, [rbx+18h]
++      @ref1 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:ls__gTextureAtlasMap
++      48 8b 50 10 // mov     rdx, [rax+10h]
++      48 8b 92 40 01 00 00 // mov     rdx, [rdx+140h]
++      e8 ?? ?? ?? ?? // call    ls__TextureAtlasMap__Load
++      <Target Type="Indirect" Offset="@ref1" Symbol="ls__gTextureAtlasMap" /></Mapping>
++    <Mapping Name="eoc::gDynamicStatsExpressionManager">
++  80 78 04 00 75 06 f3 0f 10 00 eb 03 0f 57 c0 f3 0f 2c c0
++  88 85 a8 01 00 00
++  @ref1 48 8b 3d ?? ?? ?? ??
++  @str1 48 8d 0d ?? ?? ?? ??
++  48 89 4d 58 c7 45 60 03 00 00 00 48 8b 07 48 8b 58 08
++  <Condition Type="String" Offset="@str1" Value="1d4" /><Target Type="Indirect" Offset="@ref1" Symbol="eoc__DynamicStatsExpressionManager" /></Mapping>
++    <Mapping Name="esv::OsirisVariableHelper::SavegameVisit">
++      48 89 5c 24 08 // mov     [rsp+arg_0], rbx
++      55 // push    rbp
++      56 // push    rsi
++      57 // push    rdi
++      41 56 // push    r14
++      41 57 // push    r15
++      48 83 ec 20 // sub     rsp, 20h
++      48 8b ea // mov     rbp, rdx
++      48 8b d9 // mov     rbx, rcx
++      45 33 f6 // xor     r14d, r14d
++      44 89 74 24 60 // mov     [rsp+48h+arg_10], r14d
++      40 b7 01 // mov     dil, 1
++      48 8b 8a c0 00 00 00 // mov     rcx, [rdx+0C0h]
++      48 8b 01 // mov     rax, [rcx]
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, fs_OsirisVariableHelper
++      <Condition Type="FixedString" Offset="@str1" Value="OsirisVariableHelper" /><Target Type="Absolute" Offset="0" Symbol="esv__OsirisVariableHelper__SavegameVisit" /></Mapping>
++    <Mapping Name="eoc::PassivePrototype::Init" Scope="Custom">
++      48 8b d3 // mov     rdx, rbx
++      48 8b c8 // mov     rcx, rax
++      @ref1 e8 ?? ?? ?? ?? // call    eoc__PassivePrototype__Init
++      48 ff c7 // inc     rdi
++      41 8b 86 d4 00 00 00 // mov     eax, [r14+0D4h]
++      <Target Type="Indirect" Offset="@ref1" Symbol="eoc__PassivePrototype__Init" /></Mapping>
++    <Mapping Name="RPGStats::ParseDataBuffers">
++		48 89 4c 24 08 // mov     [rsp+arg_0], rcx
++		53 // push    rbx
++		55 // push    rbp
++		56 // push    rsi
++		57 // push    rdi
++		41 54 // push    r12
++		41 55 // push    r13
++		41 56 // push    r14
++		41 57 // push    r15
++		48 83 ec 68 // sub     rsp, 68h
++		48 8b f1 // mov     rsi, rcx
++		48 8b 99 d8 03 00 00 // mov     rbx, [rcx+3D8h]
++		48 85 db // test    rbx, rbx
++		0f 84 ?? ?? ?? ?? // jz      loc_140EDA715
++		48 63 81 e4 03 00 00 // movsxd  rax, dword ptr [rcx+3E4h]
++		48 8d 04 c3 // lea     rax, [rbx+rax*8]
++		48 89 84 24 c8 00 00 00 // mov     [rsp+0A8h+arg_18], rax
++		<Target Type="Absolute" Offset="0" Symbol="RPGStats__ParseDataBuffers" /></Mapping>
++    <!-- Sig: "Stats/Generated" string -->
++    <Mapping Name="StatsShared">
++      @stats 48 8b 1d ?? ?? ?? ?? // mov     rbx, cs:gRPGStats
++      48 8b cb // mov     rcx, rbx
++      e8 ?? ?? ?? ?? // call    RPGStats__Clear
++      48 8b cb // mov     rcx, rbx
++      e8 ?? ?? ?? ?? // call    RPGStats__ClearDynamicEntries
++      48 8d 55 bf // lea     rdx, [rbp+57h+var_98]
++      48 8b cb // mov     rcx, rbx
++      @load e8 ?? ?? ?? ?? // call    RPGStats__Load
++      48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:qword_145F29418
++      e8 ?? ?? ?? ?? // call    sub_143FF6920
++      @ref5 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:eoc__gStatusPrototypeManager
++      e8 ?? ?? ?? ?? // call    eoc__StatusPrototypeManager__Init
++      @ref7 48 8b 35 ?? ?? ?? ?? // mov     rsi, cs:eoc__gPassiveManager
++      80 7e 18 00 // cmp     byte ptr [rsi+18h], 0
++      0f 85 ?? 00 00 00 // jnz     loc_1417631F1
++      4c 8b 35 ?? ?? ?? ?? // mov     r14, cs:gRPGStats
++      49 8d 4e 60 // lea     rcx, [r14+60h]
++      48 8b 01 // mov     rax, [rcx]
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, fs_PassiveData
++      ff 50 20 // call    qword ptr [rax+20h]
++      44 8b f8 // mov     r15d, eax
++      41 83 be d4 00 00 00 00 // cmp     dword ptr [r14+0D4h], 0
++      76 ?? // jbe     loc_1417631F1
++      <Condition Type="FixedString" Offset="@str1" Value="PassiveData" /><Target Type="Indirect" Offset="@stats" Symbol="gRPGStats" /><Target Type="Indirect" Offset="@load" Symbol="RPGStats__Load" /><Target Type="Absolute" Offset="0" NextSymbol="eoc::PassivePrototype::Init" NextSymbolSeekSize="0x100" /></Mapping>
++    <Mapping Name="StatsPrototypeManagers">
++      66 44 89 23 // mov     [rbx], r12w
++      @ref1 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:eoc__gSpellPrototypeManager
++      e8 ?? ?? ?? ?? // call    eoc__SpellPrototypeManager__Terminate
++      @ref3 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:eoc__gStatusPrototypeManager
++      e8 ?? ?? ?? ?? // call    eoc__StatusPrototypeManager__Terminate
++      @ref5 48 8b 1d ?? ?? ?? ?? // mov     rbx, cs:eoc__gBoostPrototypeManager
++      48 8b cb // mov     rcx, rbx
++      e8 ?? ?? ?? ?? // call    eoc__BoostPrototypeManager__Destroy
++      4c 89 63 08 // mov     [rbx+8], r12
++      @ref7 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:eoc__gPassiveManager
++      44 88 61 18 // mov     [rcx+18h], r12b
++      48 83 c1 08 // add     rcx, 8
++      e8 ?? ?? ?? ?? // call    eoc__Passives__Terminate
++      @ref9 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:eoc__gInterruptPrototypeManager
++      e8 ?? ?? ?? ?? // call    eoc__InterruptPrototypeManager__Terminate
++      <Target Type="Indirect" Offset="@ref1" Symbol="eoc__SpellPrototypeManager" /><Target Type="Indirect" Offset="@ref3" Symbol="eoc__StatusPrototypeManager" /><Target Type="Indirect" Offset="@ref5" Symbol="eoc__BoostPrototypeManager" /><Target Type="Indirect" Offset="@ref7" Symbol="eoc__PassivePrototypeManager" /><Target Type="Indirect" Offset="@ref9" Symbol="eoc__InterruptPrototypeManager" /></Mapping>
++    <Mapping Name="eoc::StatusPrototype::Init">
++      41 c7 46 04 04 00 00 00 // mov     dword ptr [r14+4], 11h
++      41 b0 01 // mov     r8b, 1
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, fs_INSURFACE
++      49 8b ce // mov     rcx, r14
++      @ref1 e8 ?? ?? ?? ?? // call    eoc__StatusPrototype__Init
++      <Condition Type="FixedString" Offset="@str1" Value="TELEPORT_FALLING" /><Target Type="Indirect" Offset="@ref1" Symbol="eoc__StatusPrototype__Init" /></Mapping>
++    <Mapping Name="eoc::ParseStaticBoosts">
++      49 8d 97 d8 00 00 00 // lea     rdx, [r15+0D8h]
++      4c 8d 45 cf // lea     r8, [rbp+57h+var_88]
++      48 8d 4d af // lea     rcx, [rbp+57h+var_A8]
++      @ref2 e8 ?? ?? ?? ?? // call    eoc__ParseStaticBoosts
++      48 83 c3 08 // add     rbx, 8
++      <Target Type="Indirect" Offset="@ref2" Symbol="eoc__ParseStaticBoosts" /></Mapping>
++    <Mapping Name="eoc::SpellPrototype::Init">
++      49 8d 54 24 20 // lea     rdx, [r12+20h]
++      49 8b cd // mov     rcx, r13
++      @ref1 e8 ?? ?? ?? ?? // call    eoc__SpellPrototype__Init
++      4d 8d 44 24 20 // lea     r8, [r12+20h]
++      48 8d 55 b7 // lea     rdx, [rbp+57h+var_A0]
++      48 8d 4e 08 // lea     rcx, [rsi+8]
++      e8 ?? ?? ?? ?? // call    sub_140EC91F0
++      48 8b 4e 38 // mov     rcx, [rsi+38h]
++      48 63 45 bb // movsxd  rax, [rbp+57h+var_9C]
++      4c 89 2c c1 // mov     [rcx+rax*8], r13
++      48 8d 8e 88 00 00 00 // lea     rcx, [rsi+88h]
++      49 8d 54 24 20 // lea     rdx, [r12+20h]
++      e8 ?? ?? ?? ?? // call    sub_140735650
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, fs_RootSpellID
++      <Condition Type="FixedString" Offset="@str1" Value="RootSpellID" /><Target Type="Indirect" Offset="@ref1" Symbol="eoc__SpellPrototype__Init" /></Mapping>
++    <Mapping Name="eoc::InterruptPrototype::Init">
++  48 8b 0e 48 03 cf eb 0a 48 69 c8 20 02 00 00 48 03 ca 48 8b d5
++  @ref1 e8 ?? ?? ?? ??
++  41 8b 85 d4 00 00 00 49 ff c6 4c 3b f0 8b 44 24 70 0f 82 ?? ?? ?? ??
++  <Target Type="Indirect" Offset="@ref1" Symbol="eoc__InterruptPrototype__Init" /></Mapping>
++    <Mapping Name="Noesis::SymbolManager">
++      48 8b f1 // mov     rsi, rcx
++      @ref1 4c 8d 2d ?? ?? ?? ?? // lea     r13, NsSymbolManagerLock
++      4c 89 ac 24 80 00 00 00 // mov     [rsp+68h+arg_10], r13
++      49 8b cd // mov     rcx, r13; SRWLock
++      ff 15 ?? ?? ?? ?? // call    cs:__imp_AcquireSRWLockExclusive
++      90 // nop
++      4c 8d 44 24 70 // lea     r8, [rsp+68h+arg_0]
++      48 8d 54 24 20 // lea     rdx, [rsp+68h+var_48]
++      @ref3 48 8d 0d ?? ?? ?? ?? // lea     rcx, NsSymbolManagerClasses
++      e8 ac 06 00 00 // call    sub_1445C8B90
++      8b 05 ?? ?? ?? ?? // mov     eax, cs:NsSymbolManagerClasses.mNumBuckets
++      48 c1 e0 04 // shl     rax, 4
++      <Target Type="Indirect" Offset="@ref1" Symbol="Noesis__SymbolManager__Lock" /><Target Type="Indirect" Offset="@ref3" Symbol="Noesis__SymbolManager__Data" /></Mapping>
++    <Mapping Name="Noesis::InvokeErrorHandler">
++      4c 89 4c 24 20 // mov     [rsp+arg_18], r9
++      53 // push    rbx
++      55 // push    rbp
++      56 // push    rsi
++      57 // push    rdi
++      b8 48 04 00 00 // mov     eax, 448h
++      e8 ?? ?? ?? ?? // call    __alloca_probe
++      48 2b e0 // sub     rsp, rax
++      48 8b 05 ?? ?? ?? ?? // mov     rax, cs:__security_cookie
++      48 33 c4 // xor     rax, rsp
++      48 89 84 24 30 04 00 00 // mov     [rsp+468h+var_38], rax
++      @ref3 48 83 3d ?? ?? ?? ?? 00 // cmp     cs:Noesis__gErrorHandler, 0
++      49 8b d9 // mov     rbx, r9
++
++      <Target Type="Indirect" Offset="@ref3" Symbol="Noesis__gErrorHandler" /></Mapping>
++    <Mapping Name="Noesis::Reflection::RegisterType">
++      8b f0 // mov     esi, eax
++      @ref1 3b 05 ?? ?? ?? ?? // cmp     eax, cs:NsReflectionLockedByThreadId
++      74 13 // jz      short loc_144598CEC
++      @ref2 48 8d 0d ?? ?? ?? ?? // lea     rcx, NsReflectionSRWLOCK; SRWLock
++      ff 15 ?? ?? ?? ?? // call    cs:__imp_AcquireSRWLockExclusive
++      89 35 ?? ?? ?? ?? // mov     cs:NsReflectionLockedByThreadId, esi
++      @ref5 ff 05 ?? ?? ?? ?? // inc     cs:NsReflectionNumLocks
++      4c 8d 44 24 50 // lea     r8, [rsp+48h+arg_0]
++      48 8d 54 24 20 // lea     rdx, [rsp+48h+var_28]
++      @ref6 48 8d 0d ?? ?? ?? ?? // lea     rcx, NsReflectionClassMap
++      e8 68 09 00 00 // call    sub_144599670
++      80 7c 24 30 00 // cmp     [rsp+48h+var_18], 0
++      0f 84 c8 00 00 00 // jz      loc_144598DDB
++      8b cb // mov     ecx, ebx
++      ff d5 // call    rbp
++      <Target Type="Indirect" Offset="@ref1" Symbol="Noesis__Reflection__LockedByThreadId" /><Target Type="Indirect" Offset="@ref2" Symbol="Noesis__Reflection__Lock" /><Target Type="Indirect" Offset="@ref5" Symbol="Noesis__Reflection__NumLocks" /><Target Type="Indirect" Offset="@ref6" Symbol="Noesis__Reflection__Data" /></Mapping>
++    <Mapping Name="Noesis::UI::LoadXaml">
++      48 8b f9 // mov     rdi, rcx
++      c7 44 24 28 00 00 00 00 // mov     dword ptr [rsp+78h+var_50], 0
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, aMaincanvasXaml; "MainCanvas.xaml"
++      48 8d 4c 24 40 // lea     rcx, [rsp+78h+var_38]
++      @ref1 e8 ?? ?? ?? ?? // call    Noesis__GUI__LoadXaml
++      90 // nop
++      <Condition Type="String" Offset="@str1" Value="MainCanvas.xaml" /><Target Type="Indirect" Offset="@ref1" Symbol="Noesis__GUI__LoadXaml" /></Mapping>
++    <Mapping Name="Noesis::Visual::AddVisualChild">
++      48 8b 97 78 02 00 00 // mov     rdx, [rdi+278h]
++      48 8b cf // mov     rcx, rdi
++      48 8b 5c 24 30 // mov     rbx, [rsp+28h+arg_0]
++      48 8b 74 24 38 // mov     rsi, [rsp+28h+arg_8]
++      48 83 c4 20 // add     rsp, 20h
++      5f // pop     rdi
++      @ref1 e9 ?? ?? ?? ?? // jmp     Noesis::Visual::RemoveVisualChild(Noesis::Visual *)
++      48 85 f6 // test    rsi, rsi
++      74 0f // jz      short loc_14486F209
++      48 8b 97 78 02 00 00 // mov     rdx, [rdi+278h]
++      48 8b cf // mov     rcx, rdi
++      @ref2 e8 ?? ?? ?? ?? // call    Noesis::Visual::AddVisualChild(Noesis::Visual *)
++      <Target Type="Indirect" Offset="@ref1" Symbol="Noesis__Visual__RemoveVisualChild" /><Target Type="Indirect" Offset="@ref2" Symbol="Noesis__Visual__AddVisualChild" /></Mapping>
++    <Mapping Name="Noesis::Visual::PointToScreen" AllowFail="true">
++      @target 48 89 5c 24 18 // mov     [rsp+18h], rbx
++      57 // push    rdi
++      b8 00 01 00 00 // mov     eax, 100h
++      e8 ?? ?? ?? ?? // call    __alloca_probe
++      48 2b e0 // sub     rsp, rax
++      0f 29 b4 24 f0 00 00 00 // movaps  [rsp+0F0h], xmm6
++      0f 29 bc 24 e0 00 00 00 // movaps  [rsp+0E0h], xmm7
++      48 8b 05 ?? ?? ?? ?? // mov     rax, [__security_cookie]
++      48 33 c4 // xor     rax, rsp
++      48 89 84 24 d0 00 00 00 // mov     [rsp+0D0h], rax
++      f3 41 0f 10 30 // movss   xmm6, dword ptr [r8]
++      48 8b fa // mov     rdi, rdx; Point return buffer
++      f3 41 0f 10 78 04 // movss   xmm7, dword ptr [r8+4]
++      48 8d 54 24 60 // lea     rdx, [rsp+60h]
++      48 8b d9 // mov     rbx, rcx; Visual this
++      <Target Type="Absolute" Offset="@target" Symbol="Noesis__Visual__PointToScreen" /></Mapping>
++    <Mapping Name="Noesis::VisualTreeHelper::HitTest" AllowFail="true">
++      4c 8d 47 18 // lea     r8, [rdi+18h]; screen Point
++      48 8d 54 24 20 // lea     rdx, [rsp+20h]; Point return buffer
++      @ref0 e8 ?? ?? ?? ?? // call    Noesis::Visual::PointFromScreen
++      4c 8b c0 // mov     r8, rax; local Point
++      48 8b 97 a8 00 00 00 // mov     rdx, [rdi+0A8h]; Visual
++      48 8d 4c 24 28 // lea     rcx, [rsp+28h]; HitTestResult return buffer
++      @ref1 e8 ?? ?? ?? ?? // call    Noesis::VisualTreeHelper::HitTest
++      48 83 38 00 // cmp     qword ptr [rax], 0; result.visualHit
++      0f 85 ?? ?? ?? ?? // jnz
++      <Target Type="Indirect" Offset="@ref0" Symbol="Noesis__Visual__PointFromScreen" /><Target Type="Indirect" Offset="@ref1" Symbol="Noesis__VisualTreeHelper__HitTest" /></Mapping>
++    <!-- Sigs: exposed as "IsReachable" -->
++    <Mapping Name="eoc::AiGrid::FindPath">
++  48 8b 83 a8 01 00 00 48 8b 98 90 00 00 00 48 85 db 74 57
++  48 8b 9b 80 00 00 00 8b d7 48 8b cb
++  @ref1 e8 ?? ?? ?? ??
++  8b d7 48 8b cb
++  @ref2 e8 ?? ?? ?? ??
++  0f b6 d8 48 8d 4d 40 e8 ?? ?? ?? ?? 90 48 8d 4c 24 70 e8 ?? ?? ?? ?? 0f b6 c3
++  <Target Type="Indirect" Offset="@ref1" Symbol="eoc__AiGrid__FindPath" /><Target Type="Indirect" Offset="@ref2" Symbol="eoc__AiGrid__FindPathImmediate" /></Mapping>
++    <!-- Sig from ecl::CharacterTask_Dialog::SetCursor -->
++    <Mapping Name="ecl::CharacterTask_Dialog::SetCursor">
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ecl__gCursorControl
++      83 78 3c 00 // cmp     dword ptr [rax+3Ch], 0
++      75 1a // jnz     short loc_141E3CAD7
++      83 78 24 02 // cmp     dword ptr [rax+24h], 2
++      74 07 // jz      short loc_141E3CACA
++      c7 40 24 02 00 00 00 // mov     dword ptr [rax+24h], 2
++      83 78 24 2a // cmp     dword ptr [rax+24h], 2Ah ; '*'
++      74 07 // jz      short loc_141E3CAD7
++      <Target Type="Indirect" Offset="@ref1" Symbol="ecl__gCursorControl" /></Mapping>
++    <!-- Sig: "ls.thoth.client.condition" -->
++    <Mapping Name="ecl::EocClient::Init">
++      49 8b 8e a8 01 00 00 // mov     rcx, [r14+1A8h]
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ls__gDragDropManager
++      48 89 88 e0 00 00 00 // mov     [rax+0E0h], rcx
++      0f 57 c0 // xorps   xmm0, xmm0
++      0f 11 45 50 // movups  [rbp+100h+var_B0], xmm0
++      33 db // xor     ebx, ebx
++      89 5d 60 // mov     [rbp+100h+var_A0], ebx
++      c7 45 64 0f 00 00 00 // mov     [rbp+100h+var_9C], 0Fh
++      88 5d 50 // mov     byte ptr [rbp+100h+var_B0], bl
++      44 8d 43 19 // lea     r8d, [rbx+19h]
++      @str1 48 8d 15 ?? ?? ?? ?? // lea     rdx, aLsThothClientC; "ls.thoth.client.condition"
++      <Condition Type="String" Offset="@str1" Value="ls.thoth.client.condition" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__gDragDropManager" /></Mapping>
++    <!-- Sig: ref to GFS::str_WrinkleWeightsR -->
++    <Mapping Name="ls::Visual::UpdateBlendshapeWeightsFromSkeleton">
++      48 8b c4 // mov     rax, rsp
++      55 // push    rbp
++      48 81 ec 80 01 00 00 // sub     rsp, 180h
++      66 83 b9 02 01 00 00 ff // cmp     word ptr [rcx+102h], 0FFFFh
++      48 8b e9 // mov     rbp, rcx
++      48 89 4c 24 38 // mov     [rsp+188h+var_150], rcx
++      0f 84 68 05 00 00 // jz      loc_143C41669
++      48 89 58 10 // mov     [rax+10h], rbx
++      48 8b 99 98 00 00 00 // mov     rbx, [rcx+98h]
++      <Target Type="Absolute" Offset="0" Symbol="ls__Visual__UpdateBlendshapeWeightsFromSkeleton" /></Mapping>
++    <Mapping Name="esv::SurfaceActionFactory">
++		48 89 9c 24 80 00 00 00 // mov     [rsp+78h+arg_0], rbx
++		89 44 24 28 // mov     [rsp+78h+var_50], eax
++		48 89 ac 24 88 00 00 00 // mov     [rsp+78h+arg_8], rbp
++		e8 ?? ?? ?? ?? // call    sub_1405E8EC0
++		@ref1 48 8b 0d ?? ?? ?? ?? // mov     rcx, cs:esv__gSurfaceActionFactory
++		4d 8b c1 // mov     r8, r9
++		b2 02 // mov     dl, 2
++		48 8b e8 // mov     rbp, rax
++		@ref2 e8 ?? ?? ?? ?? // call    esv__SurfaceActionFactory__DoCreateAction
++		48 8b d8 // mov     rbx, rax
++		48 85 c0 // test    rax, rax
++		0f 84 92 01 00 00 // jz      loc_142F89298
++		c7 40 10 00 00 00 00 // mov     dword ptr [rax+10h], 0
++		48 89 68 50 // mov     [rax+50h], rbp
++		48 8b 4e 10 // mov     rcx, [rsi+10h]
++		<Target Type="Indirect" Offset="@ref1" Symbol="esv__gSurfaceActionFactory" /><Target Type="Indirect" Offset="@ref2" Symbol="esv__SurfaceActionFactory__DoCreateAction" /></Mapping>
++    <Mapping Name="esv::TransformSurfaceAction::Init">
++		44 0f b6 4d d0 // movzx   r9d, [rbp+var_30]
++		45 0f b6 c7 // movzx   r8d, r15b
++		41 0f b6 d5 // movzx   edx, r13b
++		48 8b ce // mov     rcx, rsi
++		@ref1 e8 ?? ?? ?? ?? // call    esv__TransformSurfaceAction__Init
++		f2 41 0f 10 06 // movsd   xmm0, qword ptr [r14]
++		f2 0f 11 86 a0 00 00 00 // movsd   qword ptr [rsi+0A0h], xmm0
++		41 8b 46 08 // mov     eax, [r14+8]
++		89 86 a8 00 00 00 // mov     [rsi+0A8h], eax
++		48 89 9e 98 00 00 00 // mov     [rsi+98h], rbx
++		<Target Type="Indirect" Offset="@ref1" Symbol="esv__TransformSurfaceAction__Init" /></Mapping>
++    <Mapping Name="ui::DataContextProvider::ExecuteCommandQueues">
++		49 8d 8f c0 1c 00 00 // lea     rcx, [r15+1CC0h]
++		e8 ?? ?? ?? ?? // call    ui__DataContextProvider__PreCommandExecution
++		49 8d 8f 80 03 00 00 // lea     rcx, [r15+380h]
++		49 8b d4 // mov     rdx, r12
++		e8 ?? ?? ?? ?? // call    ui__CommandProcessor__ExecuteCommandQueue
++		49 8b d4 // mov     rdx, r12
++		49 8d 8f c0 1c 00 00 // lea     rcx, [r15+1CC0h]
++		@ref3 e8 ?? ?? ?? ?? // call    ui__DataContextProvider__ExecuteCommandQueues
++		49 8d 8f 78 08 00 00 // lea     rcx, [r15+878h]; struct __crt_stdio_stream *
++		0f 28 d6 // movaps  xmm2, xmm6
++		<Target Type="Indirect" Offset="@ref3" Symbol="ui__DataContextProvider__ExecuteCommandQueues" /></Mapping>
++    <Mapping Name="MicrosoftPC::SkipConsoleSaveClassification" Critical="true">
++  40 84 ed
++  @skip 74 2f
++  41 83 bf 18 02 00 00 06 74 25
++  49 8b 97 10 02 00 00 4d 8d 87 1c 02 00 00
++  48 8b 0d ?? ?? ?? ??
++  41 c7 87 18 02 00 00 06 00 00 00
++  e8 ?? ?? ?? ?? 49 8b cd e8 ?? ?? ?? ??
++  <Patch Type="Absolute" Offset="@skip">
++   eb 2f
++  </Patch></Mapping>
++    <Mapping Name="MicrosoftPC::SkipConsoleCrossSaveClassification" Critical="true">
++  e8 ?? ?? ?? ?? 3b 86 10 01 00 00
++  @skip 74 2d
++  83 bb 18 02 00 00 06 74 24
++  48 8b 93 10 02 00 00 4c 8d 83 1c 02 00 00
++  48 8b 0d ?? ?? ?? ?? c7 83 18 02 00 00 06 00 00 00
++  e8 ?? ?? ?? ?? 32 c0 48 8b 4c 24 30 48 33 cc
++  <Patch Type="Absolute" Offset="@skip">
++   eb 2d
++  </Patch></Mapping>
++  </Mappings>
++</BinaryMappings>
+\ No newline at end of file
+diff --git a/BG3Extender/GameHooks/DataLibraries.cpp b/BG3Extender/GameHooks/DataLibraries.cpp
+index d77085d..84b212c 100644
+--- a/BG3Extender/GameHooks/DataLibraries.cpp
++++ b/BG3Extender/GameHooks/DataLibraries.cpp
+@@ -9,9 +9,20 @@
+ #include <psapi.h>
+ #include <DbgHelp.h>
+ #include "resource.h"
++#if defined(BG3SE_MICROSOFT_7445165)
++#include <MicrosoftCompatibility/BuildIdentity.h>
++#include <MicrosoftCompatibility/OptionalMappings.h>
++#endif
+ 
+ namespace bg3se
+ {
++#if defined(BG3SE_MICROSOFT_7445165)
++    // The GDK free wrapper obtains the allocator internally and takes only ptr.
++    void MicrosoftAllocatorFree(void*, void* ptr)
++    {
++        GetStaticSymbols().MicrosoftAllocatorFree(ptr);
++    }
++#endif
+     _Post_writable_byte_size_(size) void* BG3Alloc(std::size_t size)
+     {
+         auto const& sym = GetStaticSymbols();
+@@ -65,8 +76,38 @@ namespace bg3se
+         }
+ 
+         RegisterLibraries(symbolMapper_);
++#if defined(BG3SE_MICROSOFT_7445165)
++        // Retain the normal mapper and startup-error paths. Only these audited,
++        // unused capabilities may fail without setting the global error flag.
++        // A requested CustomProfile still requires App::UpdatePaths to map.
++        for (auto& [name, mapping] : mappings_.Mappings) {
++            if (microsoft::IsOptionalMapping(name,
++                !gExtender->GetConfig().CustomProfile.empty(),
++                (mapping.Flag & SymbolMappings::Mapping::kCritical) != 0)) {
++                mapping.Flag |= SymbolMappings::Mapping::kAllowFail;
++            }
++        }
++#endif
+         symbolMapper_.MapAllSymbols(false);
+ 
++#if defined(BG3SE_MICROSOFT_7445165)
++        auto& microsoftSymbols = GetStaticSymbols();
++        if (!microsoftSymbols.App__UpdatePaths && gExtender->GetConfig().CustomProfile.empty()) {
++            WARN("Microsoft optional capability unavailable: CustomProfile relocation (not requested).");
++        }
++        if (!microsoftSymbols.ui__DataContextProvider__ExecuteCommandQueues) {
++            WARN("Microsoft optional capability unavailable: UI command-queue hook (no callback consumer).");
++        }
++        if (microsoftSymbols.MicrosoftAllocatorFree && microsoftSymbols.ls__GlobalAllocator__Get
++            && microsoftSymbols.ls__GlobalAllocator__Alloc
++            && microsoftSymbols.MicrosoftAllocatorFreeGet == microsoftSymbols.ls__GlobalAllocator__Get) {
++            microsoftSymbols.ls__GlobalAllocator__Free = &MicrosoftAllocatorFree;
++        } else {
++            ERR("Microsoft allocator contract validation failed");
++            CriticalInitFailed = true;
++        }
++#endif
++
+         CriticalInitFailed = CriticalInitFailed || symbolMapper_.HasFailedCriticalMappings();
+         InitFailed = InitFailed || symbolMapper_.HasFailedMappings();
+ 
+@@ -111,6 +152,20 @@ namespace bg3se
+ 
+     void LibraryManager::ApplyCodePatches()
+     {
++#if defined(BG3SE_MICROSOFT_7445165)
++        if (!CriticalInitFailed && !WasPatchApplied("MicrosoftPC::SkipConsoleSaveClassification")) {
++            bool local = ApplyCodePatch("MicrosoftPC::SkipConsoleSaveClassification");
++            bool cross = ApplyCodePatch("MicrosoftPC::SkipConsoleCrossSaveClassification");
++            if (local && cross) {
++                DEBUG("Microsoft PC local-mod save classification compatibility applied; game version validation retained.");
++            } else {
++                UndoCodePatch("MicrosoftPC::SkipConsoleSaveClassification");
++                UndoCodePatch("MicrosoftPC::SkipConsoleCrossSaveClassification");
++                InitFailed = true;
++                ERR("Microsoft PC save compatibility could not be applied; no partial patch retained.");
++            }
++        }
++#endif
+         if (gExtender->GetConfig().EnableAchievements && !WasPatchApplied("ls::ModuleSettings::IsModded")) {
+             if (ApplyCodePatch("ls::ModuleSettings::IsModded") && ApplyCodePatch("esv::SavegameManager::ThrowError")) {
+                 DEBUG("Modded achievements enabled.");
+@@ -228,16 +283,24 @@ namespace bg3se
+         if (pRes == NULL) return false;
+ 
+         auto pResCopy = LocalAlloc(LMEM_FIXED, dwSize);
++        if (pResCopy == nullptr) return false;
+         CopyMemory(pResCopy, pRes, dwSize);
+ 
+         UINT verLength;
+         VS_FIXEDFILEINFO * fixedFileInfo;
+-        if (VerQueryValue(pResCopy, L"\\", (LPVOID*)&fixedFileInfo, &verLength) != TRUE) return false;
++        if (VerQueryValue(pResCopy, L"\\", (LPVOID*)&fixedFileInfo, &verLength) != TRUE
++            || verLength < sizeof(VS_FIXEDFILEINFO)) {
++            LocalFree(pResCopy);
++            return false;
++        }
+ 
+         version.Major = HIWORD(fixedFileInfo->dwFileVersionMS);
+         version.Minor = LOWORD(fixedFileInfo->dwFileVersionMS);
+         version.Revision = HIWORD(fixedFileInfo->dwFileVersionLS);
+         version.Build = LOWORD(fixedFileInfo->dwFileVersionLS);
++#if defined(BG3SE_MICROSOFT_7445165)
++        version.MicrosoftBuild7445165 = microsoft::IsBuild7445165(hGameModule, pResCopy);
++#endif
+ 
+         LocalFree(pResCopy);
+         FreeResource(hData);
+diff --git a/BG3Extender/GameHooks/DataLibraries.h b/BG3Extender/GameHooks/DataLibraries.h
+index de62943..8e8edf2 100644
+--- a/BG3Extender/GameHooks/DataLibraries.h
++++ b/BG3Extender/GameHooks/DataLibraries.h
+@@ -14,11 +14,17 @@ namespace bg3se {
+     struct GameVersionInfo
+     {
+         uint16_t Major{ 0 }, Minor{ 0 }, Revision{ 0 }, Build{ 0 };
++        bool MicrosoftBuild7445165{ false };
+ 
+         inline bool IsSupported() const
+         {
++#if defined(BG3SE_MICROSOFT_7445165)
++            return MicrosoftBuild7445165 && Major == 4 && Minor == 1
++                && Revision == 1 && Build == 39597;
++#else
+             // We need v4.69 or later for game
+             return (Major == 4 && ((Minor == 69 && Revision >= 95) || (Minor > 69)));
++#endif
+         }
+     };
+ 
+diff --git a/BG3Extender/GameHooks/DataLibrariesBG3Game.cpp b/BG3Extender/GameHooks/DataLibrariesBG3Game.cpp
+index 32e3be8..645966a 100644
+--- a/BG3Extender/GameHooks/DataLibrariesBG3Game.cpp
++++ b/BG3Extender/GameHooks/DataLibrariesBG3Game.cpp
+@@ -24,7 +24,11 @@ namespace bg3se
+     {
+         if (GetModuleHandleW(L"bg3.exe") != NULL)
+         {
++#if defined(BG3SE_MICROSOFT_7445165)
++            DX11 = true;
++#else
+             DX11 = false;
++#endif
+             mapper.AddModule("Main", L"bg3.exe");
+         }
+         else
+@@ -230,6 +234,10 @@ namespace bg3se
+         SYM_OFF(ls__GlobalAllocator__Get);
+         SYM_OFF(ls__GlobalAllocator__Alloc);
+         SYM_OFF(ls__GlobalAllocator__Free);
++#if defined(BG3SE_MICROSOFT_7445165)
++        SYM_OFF(MicrosoftAllocatorFree);
++        SYM_OFF(MicrosoftAllocatorFreeGet);
++#endif
+ 
+         SYM_OFF(eoc__gGuidResourceManager);
+         SYM_OFF(ls__gGlobalResourceManager);
+diff --git a/Directory.Build.targets b/Directory.Build.targets
+new file mode 100644
+index 0000000..1979af0
+--- /dev/null
++++ b/Directory.Build.targets
+@@ -0,0 +1,14 @@
++<Project>
++  <ItemDefinitionGroup Condition="'$(BG3SEMicrosoftBuild)' == 'true'">
++    <ClCompile>
++      <PreprocessorDefinitions>BG3SE_MICROSOFT_7445165;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++    </ClCompile>
++    <ResourceCompile>
++      <PreprocessorDefinitions>BG3SE_MICROSOFT_7445165;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++    </ResourceCompile>
++  </ItemDefinitionGroup>
++  <!-- Deployment is an explicit, backed-up step, never a compiler side effect. -->
++  <PropertyGroup>
++    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
++  </PropertyGroup>
++</Project>
+diff --git a/MicrosoftCompatibility/BinaryMappingCandidates.xml b/MicrosoftCompatibility/BinaryMappingCandidates.xml
+new file mode 100644
+index 0000000..2eca7bf
+--- /dev/null
++++ b/MicrosoftCompatibility/BinaryMappingCandidates.xml
+@@ -0,0 +1,65 @@
++<?xml version="1.0"?>
++<BinaryMappings>
++  <Mappings Version="4.1.1.39597" Default="true">
++    <Mapping Name="EoCServer2/EoCClient2" Critical="true">
++      48 89 44 24 58 // mov     [rsp+78h+var_20], rax
++      0f b7 f2 // movzx   esi, dx
++      48 8b e9 // mov     rbp, rcx
++      45 33 ff // xor     r15d, r15d
++      @ref1 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ecl__gEocClient
++      4c 8b b0 98 00 00 00 // mov     r14, [rax+98h]
++      @ref2 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:ls__gGlobalSwitches
++      44 38 b8 11 01 00 00 // cmp     [rax+111h], r15b
++      75 ?? // jnz     short loc_1405C620C
++      @ref3 48 8b 05 ?? ?? ?? ?? // mov     rax, cs:esv__gEocServer
++      48 8b b8 a8 00 00 00 // mov     rdi, [rax+0A8h]
++      48 8b 4f 20 // mov     rcx, [rdi+20h]
++      <Target Type="Indirect" Offset="@ref1" Symbol="ecl__EoCClient" /><Target Type="Indirect" Offset="@ref2" Symbol="ls__GlobalSwitches" /><Target Type="Indirect" Offset="@ref3" Symbol="esv__EoCServer" /></Mapping>
++    <Mapping Name="ecl::EoCClient::Update" Critical="true">
++      @ref1 48 8b 35 ?? ?? ?? ?? // mov     rdi, cs:ecl__gEocClient
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e 98 00 00 00 // mov     rcx, [rdi+98h]
++      e8 ?? ?? ?? ?? // call    sub_1417FCCA0
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e a8 01 00 00 // mov     rcx, [rdi+1A8h]
++      @ref2 e8 ?? ?? ?? ?? // call    ecs__EntityWorld__PreUpdate
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e 90 00 00 00 // mov     rcx, [rdi+90h]
++      @ref3 e8 ?? ?? ?? ?? // call    ecl__GameStateMachine__Update
++      48 8b d3 // mov     rdx, rbx
++      48 8b 8e a8 01 00 00 // mov     rcx, [rdi+1A8h]
++      @ref4 e8 ?? ?? ?? ?? // call    ecs__EntityWorld__PostUpdate
++      48 8b 8e a8 00 00 00 // mov     rcx, [rdi+0A8h]
++      48 85 c9 // test    rcx, rcx
++      74 0c // jz      short loc_140585FA5
++      48 8b 01 // mov     rax, [rcx]
++      48 8b d3 // mov     rdx, rbx
++      ff 90 f0 00 00 00 // call    qword ptr [rax+0F0h]
++      <Target Type="Indirect" Offset="@ref3" Symbol="ecl__GameStateMachine__Update" /><Target Type="Indirect" Offset="@ref4" Symbol="ecs__EntityWorld__Update" /></Mapping>
++    <Mapping Name="App::LoadGraphicSettings" Critical="true">
++      48 89 5c 24 10 // mov     [rsp+arg_8], rbx
++      57 // push    rdi
++      48 83 ec 40 // sub     rsp, 60h
++      48 8b 05 ?? ?? ?? ?? // mov     rax, cs:__security_cookie
++      48 33 c4 // xor     rax, rsp
++      48 89 44 24 38 // mov     [rsp+68h+var_10], rax
++      48 8b f9 // mov     rdi, rcx
++      ba 04 00 00 00 // mov     edx, 4
++      @str1 4c 8d 05 ?? ?? ?? ?? // lea     r8, aGraphicsetting_0; "graphicSettings.lsx"
++      <Condition Type="String" Offset="@str1" Value="graphicSettings.lsx" /><Target Type="Absolute" Offset="0" Symbol="App__LoadGraphicSettings" /></Mapping>
++    <Mapping Name="ls::FileReader::ctor" Critical="true">
++  8d 53 0b
++  @str1 4c 8d 05 ?? ?? ?? ??
++  48 8d 4d 1f e8 ?? ?? ?? ?? 90 44 8b cb 45 33 c0
++  48 8d 55 1f 48 8d 4d 8f
++  @ref1 e8 ?? ?? ?? ??
++  <Condition Type="String" Offset="@str1" Value="Credits/credits.txt" /><Target Type="Indirect" Offset="@ref1" Symbol="ls__FileReader__ctor" /></Mapping>
++    <Mapping Name="ls::FileReader::dtor" Critical="true">
++  48 89 5c 24 10 48 89 74 24 18 57 48 83 ec 20
++  48 8b b9 88 00 00 00 33 f6 48 89 71 08 48 8b d9
++  48 89 71 10 48 85 ff 74 ?? 48 8b cf e8 ?? ?? ?? ??
++  8d 56 10 48 8b cf e8 ?? ?? ?? ?? 48 89 b3 88 00 00 00
++  8b 43 24
++  <Target Type="Absolute" Offset="0" Symbol="ls__FileReader__dtor" /></Mapping>
++  </Mappings>
++</BinaryMappings>
+\ No newline at end of file
+diff --git a/MicrosoftCompatibility/BootstrapTrace.h b/MicrosoftCompatibility/BootstrapTrace.h
+new file mode 100644
+index 0000000..18532a7
+--- /dev/null
++++ b/MicrosoftCompatibility/BootstrapTrace.h
+@@ -0,0 +1,26 @@
++#pragma once
++#include <windows.h>
++#include <cwchar>
++
++namespace bg3se::microsoft {
++
++// Early diagnostics must work before game symbols, config, or Lua exist.
++// This local investigation writes only within its existing workspace.
++inline void BootstrapTrace(wchar_t const* message, DWORD detail = 0)
++{
++    wchar_t path[32768]{};
++    auto length = GetEnvironmentVariableW(L"USERPROFILE", path, 32000);
++    if (!length || length >= 32000) return;
++    swprintf_s(path + length, std::size(path) - length,
++        L"\\BG3-Modding-Work\\Logs\\ScriptExtender\\Bootstrap-%lu.log", GetCurrentProcessId());
++    auto file = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
++        nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
++    if (file == INVALID_HANDLE_VALUE) return;
++    wchar_t line[2048]{};
++    auto count = swprintf_s(line, L"%llu %ls (%lu)\r\n", GetTickCount64(), message, detail);
++    DWORD written{};
++    if (count > 0) WriteFile(file, line, static_cast<DWORD>(count * sizeof(wchar_t)), &written, nullptr);
++    CloseHandle(file);
++}
++
++}
+diff --git a/MicrosoftCompatibility/Build-CandidateMappings.ps1 b/MicrosoftCompatibility/Build-CandidateMappings.ps1
+new file mode 100644
+index 0000000..1f50458
+--- /dev/null
++++ b/MicrosoftCompatibility/Build-CandidateMappings.ps1
+@@ -0,0 +1,42 @@
++<# Read-only investigation aid. These patterns are NOT included by the BG3SE build.
++They locate candidates in Microsoft package 1.8.907.0 / build 7445165.
++Unique byte matches do not validate function contracts or all engine data structures.
++#>
++$ErrorActionPreference='Stop'
++[xml]$upstream=Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\BG3Extender\GameHooks\BinaryMappings.xml') -Raw
++$candidate=[xml]'<?xml version="1.0"?><BinaryMappings><Mappings Version="4.1.1.39597" Default="true" /></BinaryMappings>'
++foreach($name in @('EoCServer2/EoCClient2','ecl::EoCClient::Update','App::LoadGraphicSettings')){
++  $node=@($upstream.SelectNodes('//Mapping')|Where-Object{$_.GetAttribute('Name')-eq $name})[0]
++  $copy=$candidate.ImportNode($node,$true)
++  foreach($text in @($copy.ChildNodes|Where-Object{$_.NodeType-eq [Xml.XmlNodeType]::Text})){
++    if($name-eq 'EoCServer2/EoCClient2'){$text.Value=$text.Value.Replace('75 7e','75 ??')}
++    if($name-eq 'ecl::EoCClient::Update'){$text.Value=$text.Value.Replace('48 8b 3d','48 8b 35').Replace('48 8b 8f','48 8b 8e')}
++    if($name-eq 'App::LoadGraphicSettings'){$text.Value=$text.Value.Replace('48 83 ec 60','48 83 ec 40').Replace('48 89 44 24 58','48 89 44 24 38')}
++  }
++  [void]$candidate.BinaryMappings.Mappings.AppendChild($copy)
++}
++[xml]$reader=@'
++<Root>
++ <Mapping Name="ls::FileReader::ctor" Critical="true">
++  8d 53 0b
++  @str1 4c 8d 05 ?? ?? ?? ??
++  48 8d 4d 1f e8 ?? ?? ?? ?? 90 44 8b cb 45 33 c0
++  48 8d 55 1f 48 8d 4d 8f
++  @ref1 e8 ?? ?? ?? ??
++  <Condition Type="String" Offset="@str1" Value="Credits/credits.txt" />
++  <Target Type="Indirect" Offset="@ref1" Symbol="ls__FileReader__ctor" />
++ </Mapping>
++ <Mapping Name="ls::FileReader::dtor" Critical="true">
++  48 89 5c 24 10 48 89 74 24 18 57 48 83 ec 20
++  48 8b b9 88 00 00 00 33 f6 48 89 71 08 48 8b d9
++  48 89 71 10 48 85 ff 74 ?? 48 8b cf e8 ?? ?? ?? ??
++  8d 56 10 48 8b cf e8 ?? ?? ?? ?? 48 89 b3 88 00 00 00
++  8b 43 24
++  <Target Type="Absolute" Offset="0" Symbol="ls__FileReader__dtor" />
++ </Mapping>
++</Root>
++'@
++foreach($node in $reader.Root.Mapping){[void]$candidate.BinaryMappings.Mappings.AppendChild($candidate.ImportNode($node,$true))}
++$out=Join-Path $PSScriptRoot 'BinaryMappingCandidates.xml'
++$candidate.Save($out)
++Get-FileHash -LiteralPath $out
+diff --git a/MicrosoftCompatibility/Build-Microsoft.ps1 b/MicrosoftCompatibility/Build-Microsoft.ps1
+new file mode 100644
+index 0000000..04bcdac
+--- /dev/null
++++ b/MicrosoftCompatibility/Build-Microsoft.ps1
+@@ -0,0 +1,52 @@
++[CmdletBinding()]
++param([int]$Jobs=1,[switch]$ConfigureOnly)
++$ErrorActionPreference='Stop'
++$root=Split-Path $PSScriptRoot -Parent
++$work=Split-Path (Split-Path $root -Parent) -Parent
++$portable=Join-Path $work 'Tools\PortableMSVC'
++$compiler=Get-ChildItem -LiteralPath (Join-Path $portable 'VC\Tools\MSVC') -Directory | Sort-Object Name -Descending | Select-Object -First 1
++$sdk=Get-ChildItem -LiteralPath (Join-Path $portable 'Windows Kits\10\Include') -Directory | Sort-Object Name -Descending | Select-Object -First 1
++if(-not $compiler -or -not $sdk){throw 'Portable MSVC/SDK extraction is incomplete.'}
++$vc=$compiler.FullName;$kit=Join-Path $portable 'Windows Kits\10';$sdkVersion=$sdk.Name
++$python='C:\Python3\python.exe'
++$cmake=Join-Path $work 'Tools\CMake\bin\cmake.exe'
++$ninja=Join-Path $work 'Tools\ninja\ninja.exe'
++$env:PATH="$vc\bin\Hostx64\x64;$kit\bin\$sdkVersion\x64;$(Split-Path $python);$(Split-Path $ninja);$env:PATH"
++$env:INCLUDE="$vc\include;$kit\Include\$sdkVersion\ucrt;$kit\Include\$sdkVersion\shared;$kit\Include\$sdkVersion\um;$kit\Include\$sdkVersion\winrt"
++$env:LIB="$vc\lib\x64;$kit\Lib\$sdkVersion\ucrt\x64;$kit\Lib\$sdkVersion\um\x64"
++$env:VCToolsInstallDir="$vc\";$env:VCToolsVersion=$compiler.Name
++$env:DETOURS_TARGET_PROCESSOR='X64'
++$env:VSCMD_ARG_TGT_ARCH='x64';$env:VSCMD_ARG_HOST_ARCH='x64'
++Push-Location (Join-Path $root 'External\Detours\src')
++try { & nmake /NOLOGO; if($LASTEXITCODE-ne 0){throw 'Detours build failed'} } finally {Pop-Location}
++Push-Location (Join-Path $root 'BG3Extender')
++try {
++ & $python make_enumerations.py; if($LASTEXITCODE-ne 0){throw 'Enumeration generation failed'}
++ & $python make_property_map.py; if($LASTEXITCODE-ne 0){throw 'Property-map generation failed'}
++ foreach($proto in @('Osiris\Debugger\osidebug.proto','Lua\Debugger\LuaDebug.proto','Extender\Shared\ExtenderProtocol.proto')){
++  $directory=Split-Path $proto
++  $stem=[IO.Path]::GetFileNameWithoutExtension($proto)
++  $generated=@((Join-Path $directory ($stem+'.pb.h')),(Join-Path $directory ($stem+'.pb.cc')))
++  $inputTime=(Get-Item -LiteralPath $proto).LastWriteTimeUtc
++  $compilerTime=(Get-Item -LiteralPath "$root\External\protoc\bin\protoc.exe").LastWriteTimeUtc
++  if(@($generated|Where-Object {!(Test-Path -LiteralPath $_) -or (Get-Item -LiteralPath $_).LastWriteTimeUtc-lt $inputTime -or (Get-Item -LiteralPath $_).LastWriteTimeUtc-lt $compilerTime}).Count-eq 0){continue}
++  & "$root\External\protoc\bin\protoc.exe" "--proto_path=$directory" "--cpp_out=$directory" $proto
++  if($LASTEXITCODE-ne 0){throw "Protobuf generation failed: $proto"}
++ }
++} finally {Pop-Location}
++& (Join-Path $PSScriptRoot 'Build-MicrosoftMappings.ps1') | Out-Null
++& $python (Join-Path $PSScriptRoot 'Generate-CMake.py')
++if($LASTEXITCODE-ne 0){throw 'Portable build generation failed'}
++$build=Join-Path $work 'Build\BG3SE-Microsoft'
++& $cmake -S $PSScriptRoot -B $build -G Ninja '-DCMAKE_BUILD_TYPE=Release' "-DCMAKE_MAKE_PROGRAM=$ninja" "-DCMAKE_C_COMPILER=$vc\bin\Hostx64\x64\cl.exe" "-DCMAKE_CXX_COMPILER=$vc\bin\Hostx64\x64\cl.exe"
++if($LASTEXITCODE-ne 0){throw 'CMake configuration failed'}
++if(-not $ConfigureOnly){
++ & $cmake --build $build --target BG3Extender --parallel $Jobs
++ if($LASTEXITCODE-ne 0){throw 'BG3SE Microsoft build failed'}
++ $artifact=Join-Path $build 'BG3ScriptExtender.dll'
++ $hash=(Get-FileHash -LiteralPath $artifact).Hash
++ $commit=git -C $root rev-parse HEAD
++ $dirty=@(git -C $root status --porcelain)
++ [pscustomobject]@{BuildSucceeded=$true;CompletedUtc=[DateTime]::UtcNow.ToString('o');Binary=$artifact;SHA256=$hash;GitCommit=$commit;WorkingTreeChanges=$dirty;Compiler=$compiler.Name;WindowsSDK=$sdkVersion;Jobs=$Jobs;Package='LarianStudiosGamesLtd.baldurssgate3_1.8.907.0_x64__551z37b1dechw';RuntimeVerified=$false}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $build 'BuildArtifact.json')
++ Get-FileHash -LiteralPath $artifact
++}
+diff --git a/MicrosoftCompatibility/Build-MicrosoftMappings.ps1 b/MicrosoftCompatibility/Build-MicrosoftMappings.ps1
+new file mode 100644
+index 0000000..62d02a0
+--- /dev/null
++++ b/MicrosoftCompatibility/Build-MicrosoftMappings.ps1
+@@ -0,0 +1,170 @@
++[CmdletBinding()]
++param()
++$ErrorActionPreference='Stop'
++$root=Split-Path $PSScriptRoot -Parent
++& (Join-Path $PSScriptRoot 'Build-CandidateMappings.ps1') | Out-Null
++[xml]$doc=Get-Content -LiteralPath (Join-Path $root 'BG3Extender\GameHooks\BinaryMappings.xml') -Raw
++[xml]$candidates=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'BinaryMappingCandidates.xml') -Raw
++foreach($candidate in $candidates.SelectNodes('//Mapping')){
++ $original=@($doc.SelectNodes('//Mapping') | Where-Object {$_.GetAttribute('Name') -eq $candidate.GetAttribute('Name')})
++ if($original.Count-ne 1){throw 'Expected exactly one mapping to replace'}
++ [void]$original[0].ParentNode.ReplaceChild($doc.ImportNode($candidate,$true),$original[0])
++}
++# The Microsoft wWinMain retains the same App constructor sequence but keeps
++# the newly allocated App in r14 instead of r12. The literal guard remains.
++$app=@($doc.SelectNodes('//Mapping') | Where-Object {$_.GetAttribute('Name')-eq 'App::Instance'})[0]
++foreach($text in @($app.ChildNodes|Where-Object {$_.NodeType-eq [Xml.XmlNodeType]::Text})){
++ $text.Value=$text.Value.Replace('4c 8b e0','4c 8b f0')
++}
++# The same statistics loader ends this block with a short JBE. Its PassiveData
++# fixed-string guard was independently verified in the live Microsoft pool.
++$stats=@($doc.SelectNodes('//Mapping') | Where-Object {$_.GetAttribute('Name')-eq 'StatsShared'})[0]
++foreach($text in @($stats.ChildNodes|Where-Object {$_.NodeType-eq [Xml.XmlNodeType]::Text})){
++ $text.Value=$text.Value.Replace('0f 86 ?? 00 00 00','76 ??')
++}
++[xml]$inputMapping=@'
++<Mapping Name="ls::gInputManager">
++  84 d2 74 1f
++  @str1 48 8d 05 ?? ?? ?? ??
++  c7 44 24 38 2e 00 00 00 48 89 44 24 30
++  0f 28 44 24 30 66 0f 7f 44 24 30
++  @ref1 48 8b 3d ?? ?? ?? ??
++  33 d2 48 8b cf e8 ?? ?? ?? ??
++  33 d2 48 8b ce e8 ?? ?? ?? ??
++  ba 01 00 00 00 4c 8d 44 24 30 48 8d 4c 24 40
++  <Condition Type="String" Offset="@str1" Value="PlayerProfiles/Eoc/controller_WhiteBoxing.json" />
++  <Target Type="Indirect" Offset="@ref1" Symbol="ls__gInputManager" />
++</Mapping>
++'@
++# Microsoft omits keyboard_WhiteBoxing.json. The controller and normal keyboard
++# profile loaders independently reference the same input-manager global.
++$oldInput=@($doc.SelectNodes('//Mapping')|Where-Object {$_.GetAttribute('Name')-eq 'ls::gInputManager'})[0]
++[void]$oldInput.ParentNode.ReplaceChild($doc.ImportNode($inputMapping.DocumentElement,$true),$oldInput)
++[xml]$allocator=@'
++<Mappings>
++  <Mapping Name="MicrosoftAllocatorFreeContract" Scope="Custom">
++    40 57 48 83 ec 20 48 8b f9
++    @get e8 ?? ?? ?? ??
++    4c 8b d8 48 85 ff 74 79 48 8b d7 c7 44 24 30 ff ff ff ff
++    48 8b c8 e8 ?? ?? ?? ?? 84 c0 74 29
++    4c 8d 44 24 30 48 8b d7 e8 ?? ?? ?? ?? 84 c0 74 18
++    8b 54 24 30 49 8d 8b e8 00 00 00 4c 8b c7 48 83 c4 20 5f e9 ?? ?? ?? ??
++    <Target Type="Absolute" Offset="0" Symbol="MicrosoftAllocatorFree" />
++    <Target Type="Indirect" Offset="@get" Symbol="MicrosoftAllocatorFreeGet" />
++  </Mapping>
++  <Mapping Name="MicrosoftAllocatorAllocContract" Scope="Custom">
++    48 83 ec 28 48 8b c2 4c 8b c1 48 85 d2 75 05 48 83 c4 28 c3
++    48 8b 54 24 50 33 c9
++    <Target Type="Absolute" Offset="0" Symbol="ls__GlobalAllocator__Alloc" />
++  </Mapping>
++  <Mapping Name="ls__GlobalAllocator" Critical="true">
++    4c 8b 74 24 68 48 8b 0e e8 ?? ?? ?? ?? 4c 89 26 4c 8b 64 24 60 eb 2a
++    48 8b cb
++    @free e8 ?? ?? ?? ??
++    @get e8 ?? ?? ?? ??
++    33 d2 48 c7 44 24 20 10 00 00 00 48 8b c8
++    @alloc e8 ?? ?? ?? ??
++    45 33 ff 48 89 06 44 89 7e 08
++    <!-- Pattern::Scan uses an exclusive start-position bound. The full
++         86-byte contract requires an 87-byte window to test offset zero. -->
++    <Target Type="Indirect" Offset="@free" NextSymbol="MicrosoftAllocatorFreeContract" NextSymbolSeekSize="87" />
++    <Target Type="Indirect" Offset="@get" Symbol="ls__GlobalAllocator__Get" />
++    <Target Type="Indirect" Offset="@alloc" NextSymbol="MicrosoftAllocatorAllocContract" NextSymbolSeekSize="32" />
++  </Mapping>
++</Mappings>
++'@
++$old=@($doc.SelectNodes('//Mapping') | Where-Object {$_.GetAttribute('Name') -eq 'ls__GlobalAllocator'})[0]
++foreach($node in $allocator.Mappings.Mapping){[void]$old.ParentNode.InsertBefore($doc.ImportNode($node,$true),$old)}
++[void]$old.ParentNode.RemoveChild($old)
++# Microsoft compiler register allocation differs, while the complete nine-case
++# functor dispatcher and the argument origins are unchanged (audited live).
++foreach($name in @('esv::spell_cast::UnitTestHelper::ExecuteStatsFunctors','eoc::DealDamageFunctor::ApplyDamage','eoc::StatusPrototype::Init')) {
++ $node=@($doc.SelectNodes('//Mapping')|Where-Object {$_.GetAttribute('Name') -eq $name})[0]
++ foreach($text in @($node.ChildNodes|Where-Object {$_.NodeType-eq [Xml.XmlNodeType]::Text})) {
++  if($name-eq 'esv::spell_cast::UnitTestHelper::ExecuteStatsFunctors'){$text.Value=$text.Value.Replace('49 8b ce','48 8b ce')}
++  if($name-eq 'eoc::DealDamageFunctor::ApplyDamage'){$text.Value=$text.Value.Replace('48 8b 7d 80','48 8b 5d 80').Replace('48 8b d7','48 8b d3').Replace('48 8b 5d 90','48 8b 7d 90').Replace('48 8b cb','48 8b cf')}
++  if($name-eq 'eoc::StatusPrototype::Init'){$text.Value=$text.Value.Replace('41 c7 46 04 11 00 00 00','41 c7 46 04 04 00 00 00')}
++ }
++ if($name-eq 'eoc::StatusPrototype::Init'){$node.Condition.SetAttribute('Value','TELEPORT_FALLING')}
++}
++[xml]$additional=@'
++<Mappings>
++ <Mapping Name="esv::StatsSystem::ThrowDamageEvent">
++  88 44 24 20
++  4c 8d 8d 60 09 00 00
++  4c 8d 85 70 05 00 00
++  48 8d 95 50 02 00 00
++  48 8b 8d 98 00 00 00
++  @ref1 e8 ?? ?? ?? ??
++  80 bd 76 05 00 00 0a
++  0f 84 3a 02 00 00
++  83 bd 70 05 00 00 00
++  41 0f 9f c4
++  <Target Type="Indirect" Offset="@ref1" Symbol="esv__StatsSystem__ThrowDamageEvent" />
++ </Mapping>
++ <Mapping Name="eoc::gDynamicStatsExpressionManager">
++  80 78 04 00 75 06 f3 0f 10 00 eb 03 0f 57 c0 f3 0f 2c c0
++  88 85 a8 01 00 00
++  @ref1 48 8b 3d ?? ?? ?? ??
++  @str1 48 8d 0d ?? ?? ?? ??
++  48 89 4d 58 c7 45 60 03 00 00 00 48 8b 07 48 8b 58 08
++  <Condition Type="String" Offset="@str1" Value="1d4" />
++  <Target Type="Indirect" Offset="@ref1" Symbol="eoc__DynamicStatsExpressionManager" />
++ </Mapping>
++ <Mapping Name="eoc::InterruptPrototype::Init">
++  48 8b 0e 48 03 cf eb 0a 48 69 c8 20 02 00 00 48 03 ca 48 8b d5
++  @ref1 e8 ?? ?? ?? ??
++  41 8b 85 d4 00 00 00 49 ff c6 4c 3b f0 8b 44 24 70 0f 82 ?? ?? ?? ??
++  <Target Type="Indirect" Offset="@ref1" Symbol="eoc__InterruptPrototype__Init" />
++ </Mapping>
++ <Mapping Name="eoc::AiGrid::FindPath">
++  48 8b 83 a8 01 00 00 48 8b 98 90 00 00 00 48 85 db 74 57
++  48 8b 9b 80 00 00 00 8b d7 48 8b cb
++  @ref1 e8 ?? ?? ?? ??
++  8b d7 48 8b cb
++  @ref2 e8 ?? ?? ?? ??
++  0f b6 d8 48 8d 4d 40 e8 ?? ?? ?? ?? 90 48 8d 4c 24 70 e8 ?? ?? ?? ?? 0f b6 c3
++  <Target Type="Indirect" Offset="@ref1" Symbol="eoc__AiGrid__FindPath" />
++  <Target Type="Indirect" Offset="@ref2" Symbol="eoc__AiGrid__FindPathImmediate" />
++ </Mapping>
++</Mappings>
++'@
++foreach($node in $additional.Mappings.Mapping){
++ $old=@($doc.SelectNodes('//Mapping')|Where-Object {$_.GetAttribute('Name')-eq $node.GetAttribute('Name')})[0]
++ [void]$old.ParentNode.ReplaceChild($doc.ImportNode($node,$true),$old)
++}
++# Microsoft PC inherits two console-catalogue save classifiers. Preserve the
++# existing validity value (including real version errors) by skipping only the
++# assignment of ModdedCrossSaveConsole=6. Full branch/body signatures retained.
++[xml]$localSaves=@'
++<Mappings>
++ <Mapping Name="MicrosoftPC::SkipConsoleSaveClassification" Critical="true">
++  40 84 ed
++  @skip 74 2f
++  41 83 bf 18 02 00 00 06 74 25
++  49 8b 97 10 02 00 00 4d 8d 87 1c 02 00 00
++  48 8b 0d ?? ?? ?? ??
++  41 c7 87 18 02 00 00 06 00 00 00
++  e8 ?? ?? ?? ?? 49 8b cd e8 ?? ?? ?? ??
++  <Patch Type="Absolute" Offset="@skip">
++   eb 2f
++  </Patch>
++ </Mapping>
++ <Mapping Name="MicrosoftPC::SkipConsoleCrossSaveClassification" Critical="true">
++  e8 ?? ?? ?? ?? 3b 86 10 01 00 00
++  @skip 74 2d
++  83 bb 18 02 00 00 06 74 24
++  48 8b 93 10 02 00 00 4c 8d 83 1c 02 00 00
++  48 8b 0d ?? ?? ?? ?? c7 83 18 02 00 00 06 00 00 00
++  e8 ?? ?? ?? ?? 32 c0 48 8b 4c 24 30 48 33 cc
++  <Patch Type="Absolute" Offset="@skip">
++   eb 2d
++  </Patch>
++ </Mapping>
++</Mappings>
++'@
++foreach($node in $localSaves.Mappings.Mapping){[void]$doc.BinaryMappings.Mappings.AppendChild($doc.ImportNode($node,$true))}
++$doc.BinaryMappings.Mappings.SetAttribute('Version','Microsoft-1.8.907.0-7445165')
++$output=Join-Path $root 'BG3Extender\GameHooks\BinaryMappingsMicrosoft7445165.xml'
++$doc.Save($output)
++Get-FileHash -LiteralPath $output
+diff --git a/MicrosoftCompatibility/BuildIdentity.h b/MicrosoftCompatibility/BuildIdentity.h
+new file mode 100644
+index 0000000..467f2f4
+--- /dev/null
++++ b/MicrosoftCompatibility/BuildIdentity.h
+@@ -0,0 +1,35 @@
++#pragma once
++#include <windows.h>
++#include <appmodel.h>
++#include <cwchar>
++#include <iterator>
++
++namespace bg3se::microsoft {
++
++// This experimental binary accepts only the locally audited GDK package.
++// The truncated fixed resource version alone is not an engine build identity.
++inline bool IsBuild7445165(HMODULE module, void* versionResource)
++{
++    if (module != GetModuleHandleW(L"bg3.exe")) return false;
++    wchar_t package[PACKAGE_FULL_NAME_MAX_LENGTH + 1]{};
++    UINT32 length = static_cast<UINT32>(std::size(package));
++    if (GetCurrentPackageFullName(&length, package) != ERROR_SUCCESS
++        || wcscmp(package, L"LarianStudiosGamesLtd.baldurssgate3_1.8.907.0_x64__551z37b1dechw") != 0) {
++        return false;
++    }
++    wchar_t* specialBuild{ nullptr };
++    UINT chars{ 0 };
++    if (!VerQueryValueW(versionResource, L"\\StringFileInfo\\040904b0\\SpecialBuild",
++        reinterpret_cast<void**>(&specialBuild), &chars)
++        || specialBuild == nullptr || chars != 8 || wcscmp(specialBuild, L"7445165") != 0) {
++        return false;
++    }
++    auto dos = reinterpret_cast<IMAGE_DOS_HEADER const*>(module);
++    if (dos->e_magic != IMAGE_DOS_SIGNATURE || dos->e_lfanew <= 0 || dos->e_lfanew > 4096) return false;
++    auto pe = reinterpret_cast<IMAGE_NT_HEADERS64 const*>(reinterpret_cast<char const*>(module) + dos->e_lfanew);
++    return pe->Signature == IMAGE_NT_SIGNATURE
++        && pe->FileHeader.Machine == IMAGE_FILE_MACHINE_AMD64
++        && pe->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC;
++}
++
++}
+diff --git a/MicrosoftCompatibility/Fetch-Dependencies.ps1 b/MicrosoftCompatibility/Fetch-Dependencies.ps1
+new file mode 100644
+index 0000000..2e30216
+--- /dev/null
++++ b/MicrosoftCompatibility/Fetch-Dependencies.ps1
+@@ -0,0 +1,61 @@
++[CmdletBinding()]
++param()
++$ErrorActionPreference='Stop'
++$root=Split-Path $PSScriptRoot -Parent
++$work=Split-Path (Split-Path $root -Parent) -Parent
++$external=Join-Path $root 'External'
++$download=Join-Path $work 'Downloads\BG3SE-Build'
++New-Item -ItemType Directory -Path $external,$download -Force | Out-Null
++$repos=@(
++ @{Name='Detours';Url='https://github.com/microsoft/Detours';Ref='v4.0.1'},
++ @{Name='glm';Url='https://github.com/g-truc/glm';Ref='1.0.3'},
++ @{Name='imgui';Url='https://github.com/Norbyte/imgui';Ref=''},
++ @{Name='lua';Url='https://github.com/Norbyte/lua-dos';Ref=''},
++ @{Name='optick';Url='https://github.com/Norbyte/optick';Ref=''},
++ @{Name='protobuf';Url='https://github.com/protocolbuffers/protobuf';Ref='v36.1'},
++ @{Name='rapidjson';Url='https://github.com/tencent/rapidjson';Ref='24b5e7a8b27f42fa16b96fc70aade9106cf7102f'},
++ @{Name='tinycrypt';Url='https://github.com/intel/tinycrypt';Ref=''},
++ @{Name='Vulkan';Url='https://github.com/KhronosGroup/Vulkan-Headers';Ref='vulkan-sdk-1.4.357'},
++ @{Name='ZipLib';Url='https://github.com/Norbyte/ZipLib';Ref=''}
++)
++$git=(Get-Command git).Source
++$results=@($repos | ForEach-Object -Parallel {
++ $ErrorActionPreference='Stop'; $repo=$_; $dest=Join-Path $using:external $repo.Name
++ try {
++  if(-not(Test-Path -LiteralPath $dest)){
++   $args=@('clone','--depth','1')
++   if($repo.Ref -and $repo.Ref.Length-ne 40){$args+=@('--branch',$repo.Ref)}
++   & $using:git @args $repo.Url $dest 2>&1 | Out-Null
++   if($LASTEXITCODE-ne 0){throw "Clone failed: $($repo.Name)"}
++   if($repo.Ref.Length-eq 40){
++    & $using:git -C $dest fetch --depth 1 origin $repo.Ref 2>&1 | Out-Null
++    if($LASTEXITCODE-ne 0){throw 'Pinned revision fetch failed'}
++    & $using:git -C $dest checkout --detach $repo.Ref 2>&1 | Out-Null
++    if($LASTEXITCODE-ne 0){throw 'Pinned revision checkout failed'}
++   }
++  }
++  $commit=& $using:git -C $dest rev-parse HEAD
++  if($LASTEXITCODE-ne 0){throw 'Cannot identify repository revision'}
++  [pscustomobject]@{Name=$repo.Name;Source=$repo.Url;Ref=$repo.Ref;Commit=$commit;Path=$dest;Status='FETCHED'}
++ }catch{[pscustomobject]@{Name=$repo.Name;Status='FAILED';Error=$_.Exception.Message}}
++} -ThrottleLimit 4)
++$archives=@(
++ @{Name='curl';Url='https://bg3se-updates.norbyte.dev/Stuff/curl.zip';Target=$external;Strip=0},
++ @{Name='NoesisGUI';Url='https://bg3se-updates.norbyte.dev/Stuff/NoesisGUI-NativeSDK-win-3.1.7-Indie.zip';Target=$external;Strip=0},
++ @{Name='protoc';Url='https://github.com/protocolbuffers/protobuf/releases/download/v36.1/protoc-36.1-win64.zip';Target=(Join-Path $external 'protoc');Strip=0},
++ @{Name='SDL';Url='https://github.com/libsdl-org/SDL/releases/download/release-2.30.6/SDL2-devel-2.30.6-VC.zip';Target=(Join-Path $external 'SDL');Strip=1}
++)
++$results+=@($archives | ForEach-Object -Parallel {
++ $ErrorActionPreference='Stop'; $a=$_; $zip=Join-Path $using:download ($a.Name+'.zip')
++ try {
++  if(-not(Test-Path -LiteralPath $zip)){Invoke-WebRequest -Uri $a.Url -OutFile $zip}
++  New-Item -ItemType Directory -Path $a.Target -Force | Out-Null
++  # Known author build dependencies only; tar performs no code execution.
++  & tar -xf $zip -C $a.Target --strip-components $a.Strip
++  if($LASTEXITCODE-ne 0){throw 'Archive extraction failed'}
++  [pscustomobject]@{Name=$a.Name;Source=$a.Url;Path=$a.Target;Archive=$zip;SHA256=(Get-FileHash -LiteralPath $zip).Hash;Status='FETCHED'}
++ }catch{[pscustomobject]@{Name=$a.Name;Status='FAILED';Error=$_.Exception.Message}}
++} -ThrottleLimit 4)
++$results | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $work 'Logs\BG3SE-BuildDependencies.json')
++$results | Select-Object Name,Status,Commit,Error | Format-Table -AutoSize
++if($results.Status-contains 'FAILED'){throw 'One or more dependencies failed; see BG3SE-BuildDependencies.json'}
+diff --git a/MicrosoftCompatibility/Generate-CMake.py b/MicrosoftCompatibility/Generate-CMake.py
+new file mode 100644
+index 0000000..eb6de84
+--- /dev/null
++++ b/MicrosoftCompatibility/Generate-CMake.py
+@@ -0,0 +1,111 @@
++"""Portable MSVC build: derive source lists/definitions from upstream projects.
++
++No deployment, game launch, updater download, or system configuration occurs.
++"""
++from pathlib import Path
++import xml.etree.ElementTree as ET
++
++root = Path(__file__).resolve().parent.parent
++ns = {"m": "http://schemas.microsoft.com/developer/msbuild/2003"}
++lines = [
++    "cmake_minimum_required(VERSION 3.25)",
++    "cmake_policy(SET CMP0091 NEW)",
++    "project(BG3SEMicrosoft LANGUAGES C CXX RC)",
++    'set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")',
++    'add_compile_definitions(BG3SE_MICROSOFT_7445165 _ITERATOR_DEBUG_LEVEL=0)',
++    'add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/std:c++latest>" /Zi /FS)',
++    'set(protobuf_BUILD_TESTS OFF CACHE BOOL "" FORCE)',
++    'set(protobuf_BUILD_PROTOC_BINARIES OFF CACHE BOOL "" FORCE)',
++    'set(protobuf_BUILD_LIBPROTOC OFF CACHE BOOL "" FORCE)',
++    'set(protobuf_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)',
++    'set(protobuf_MSVC_STATIC_RUNTIME ON CACHE BOOL "" FORCE)',
++    'set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)',
++    f'add_subdirectory("{root.as_posix()}/External/protobuf" protobuf)',
++]
++
++def quote(path):
++    return '"' + str(path).replace('\\', '/') + '"'
++
++def expand(text, folder):
++    return text.replace('$(SolutionDir)', root.as_posix() + '/').replace('$(ProjectDir)', folder.as_posix() + '/').replace('\\', '/')
++
++for name in ('CoreLib', 'LuaLib', 'imgui', 'Optick', 'TinyCrypt', 'ResourceBundler', 'BG3Extender'):
++    folder = root / name
++    doc = ET.parse(folder / (name + '.vcxproj'))
++    config = 'Game Release|x64' if name == 'BG3Extender' else 'Release|x64'
++    groups = [g for g in doc.findall('m:ItemDefinitionGroup', ns) if f"'{config}'" in g.get('Condition', '')]
++    assert len(groups) == 1, (name, len(groups))
++    group = groups[0]
++    compile = group.find('m:ClCompile', ns)
++    sources = []
++    explicit_cpp_sources = []
++    no_pch = []
++    big_objects = []
++    for node in doc.findall('m:ItemGroup/m:ClCompile', ns):
++        source = node.get('Include')
++        if not source:
++            continue
++        excluded = any(x.text == 'true' and (not x.get('Condition') or f"'{config}'" in x.get('Condition')) for x in node.findall('m:ExcludedFromBuild', ns))
++        if not excluded:
++            path = (folder / source.replace('\\', '/')).resolve()
++            sources.append(path)
++            # MSBuild ClCompile includes are compilation units even when named
++            # .inl (StatsObject.inl). CMake otherwise treats them as headers.
++            if path.suffix.lower() not in ('.c', '.cc', '.cpp', '.cxx', '.c++'):
++                explicit_cpp_sources.append(path)
++            if any(x.text == 'NotUsing' and (not x.get('Condition') or f"'{config}'" in x.get('Condition')) for x in node.findall('m:PrecompiledHeader', ns)):
++                no_pch.append(path)
++            # The 2026 compiler also needs the upstream Debug big-object choice
++            # for these large template units in the optimized portable build.
++            if any('/bigobj' in (x.text or '') for x in node.findall('m:AdditionalOptions', ns)):
++                big_objects.append(path)
++    kind = 'SHARED' if name == 'BG3Extender' else 'STATIC'
++    command = f'add_library({name} {kind}' if name != 'ResourceBundler' else 'add_executable(ResourceBundler'
++    lines += [command] + [quote(p) for p in sources] + [')']
++    if explicit_cpp_sources:
++        lines.append('set_source_files_properties(' + ' '.join(map(quote, explicit_cpp_sources)) + ' PROPERTIES LANGUAGE CXX)')
++    if big_objects:
++        lines.append('set_source_files_properties(' + ' '.join(map(quote, big_objects)) + ' PROPERTIES COMPILE_OPTIONS /bigobj)')
++    lines.append(f'target_include_directories({name} PRIVATE {quote(folder)} {quote(root)})')
++    includes = compile.findtext('m:AdditionalIncludeDirectories', '', ns)
++    for item in includes.split(';'):
++        if item and not item.startswith('%('):
++            lines.append(f'target_include_directories({name} PRIVATE {quote(expand(item, folder))})')
++    defines = compile.findtext('m:PreprocessorDefinitions', '', ns)
++    for define in defines.split(';'):
++        if define and not define.startswith('%('):
++            lines.append(f'target_compile_definitions({name} PRIVATE {define})')
++    # All upstream projects use Unicode Windows APIs.
++    lines.append(f'target_compile_definitions({name} PRIVATE UNICODE _UNICODE)')
++    warnings = compile.findtext('m:DisableSpecificWarnings', '', ns)
++    for warning in warnings.split(';'):
++        if warning.isdecimal():
++            lines.append(f'target_compile_options({name} PRIVATE /wd{warning})')
++    if compile.findtext('m:RuntimeTypeInfo', '', ns) == 'false':
++        lines.append(f'target_compile_options({name} PRIVATE /GR-)')
++    if compile.findtext('m:FloatingPointModel', '', ns) == 'Fast':
++        lines.append(f'target_compile_options({name} PRIVATE /fp:fast)')
++    if compile.findtext('m:CompileAs', '', ns) == 'CompileAsCpp':
++        lines.append('set_source_files_properties(' + ' '.join(map(quote, sources)) + ' PROPERTIES LANGUAGE CXX)')
++    if compile.findtext('m:PrecompiledHeader', '', ns) == 'Use':
++        header = compile.findtext('m:PrecompiledHeaderFile', 'stdafx.h', ns)
++        lines.append(f'target_precompile_headers({name} PRIVATE {quote(folder / header)})')
++        if no_pch:
++            lines.append('set_source_files_properties(' + ' '.join(map(quote, no_pch)) + ' PROPERTIES SKIP_PRECOMPILE_HEADERS ON)')
++
++lines += [
++    f'target_sources(BG3Extender PRIVATE "{root.as_posix()}/BG3Extender/BG3Extender.rc")',
++    f'set_source_files_properties("{root.as_posix()}/BG3Extender/BG3Extender.rc" PROPERTIES OBJECT_DEPENDS "{root.as_posix()}/BG3Extender/GameHooks/BinaryMappingsMicrosoft7445165.xml;{root.as_posix()}/BG3Extender/Lua.bundle")',
++    'set_target_properties(BG3Extender PROPERTIES OUTPUT_NAME BG3ScriptExtender)',
++    f'target_link_options(BG3Extender PRIVATE "/DEF:{root.as_posix()}/BG3Extender/Exports.def" /DEBUG /DELAYLOAD:vulkan-1.dll /DELAYLOAD:d3dcompiler_47.dll)',
++    f'target_link_directories(BG3Extender PRIVATE "{root.as_posix()}/External/Detours/lib.X64" "{root.as_posix()}/External/SDL/lib/x64" "{root.as_posix()}/External/VulkanLib/Lib")',
++    'target_link_libraries(BG3Extender PRIVATE CoreLib LuaLib imgui Optick TinyCrypt libprotobuf-lite dxguid SDL2 vulkan-1 ws2_32 shlwapi Rpcrt4 detours dbghelp version winhttp comctl32 kernel32 user32 gdi32 winspool comdlg32 advapi32 shell32 ole32 oleaut32 uuid odbc32 odbccp32 delayimp d3d11 d3dcompiler)',
++    f'add_custom_command(OUTPUT "{root.as_posix()}/BG3Extender/Lua.bundle" COMMAND ResourceBundler "{root.as_posix()}/BG3Extender/LuaScripts" "{root.as_posix()}/BG3Extender/Lua.bundle" DEPENDS ResourceBundler)',
++    f'add_custom_target(LuaBundle DEPENDS "{root.as_posix()}/BG3Extender/Lua.bundle")',
++    'add_dependencies(BG3Extender LuaBundle)',
++]
++output = root / 'MicrosoftCompatibility' / 'CMakeLists.txt'
++content = '\n'.join(lines) + '\n'
++if not output.exists() or output.read_text(encoding='utf-8') != content:
++    output.write_text(content, encoding='utf-8')
++print(f'Generated {output} from upstream vcxproj source lists and release definitions.')
+diff --git a/MicrosoftCompatibility/OptionalMappings.h b/MicrosoftCompatibility/OptionalMappings.h
+new file mode 100644
+index 0000000..dfe6816
+--- /dev/null
++++ b/MicrosoftCompatibility/OptionalMappings.h
+@@ -0,0 +1,16 @@
++#pragma once
++#include <string_view>
++
++namespace bg3se::microsoft {
++
++// Exact-build compatibility policy, not a general mapping-error suppression.
++// UpdatePaths is used only by CustomProfile; the command-queue hook has no
++// registered callback consumer in this revision. Missing pointers remain null.
++constexpr bool IsOptionalMapping(std::string_view name, bool customProfileRequested, bool critical)
++{
++    if (critical) return false;
++    return (name == "App::UpdatePaths" && !customProfileRequested)
++        || name == "ui::DataContextProvider::ExecuteCommandQueues";
++}
++
++}
+diff --git a/MicrosoftCompatibility/README.md b/MicrosoftCompatibility/README.md
+new file mode 100644
+index 0000000..8b1f91b
+--- /dev/null
++++ b/MicrosoftCompatibility/README.md
+@@ -0,0 +1,89 @@
++# Experimental Microsoft PC port: engine build 7445165
++
++## September 19 startup warning correction
++
++Native commit `220a4a468bf5496bdd2a80251718acda0cc13d7f` adds an exact-name optional-mapping policy before the existing symbol mapper runs. `App::UpdatePaths` may be missing only when CustomProfile is empty; `ui::DataContextProvider::ExecuteCommandQueues` has no callback consumer in this revision. Critical declarations override the new policy. Missing pointers stay null and explicit capability warnings remain logged. The global failure aggregation and error-dialog code are unchanged.
++
++`Test-OptionalMappings.cpp` supplies 12 compile-time cases covering requested features, critical precedence, unrelated mappings and near matches. Actual isolated Xbox startup on September 19 reached the main menu with v33 loaded and no startup popup. Client initialization and Lua VM reset are in `Logs/ScriptExtender/Extender Runtime 2026-09-19 09-58-18.log`; `EarlyRuntime-11900.log` retains the capability warnings. This targeted test did not load a campaign. All user packages/orders were restored byte-for-byte.
++
++DLL SHA-256: `846057960E4D9E7544E87E15D58948BBC4F7E2BA08153007F7D2C0F1C2DFC85D`. The September 15 full Lua/Osiris/save/reload verification below describes the earlier native build; it is retained as historical evidence.
++
++Upstream: Norbyte/bg3se commit `77e9072f1092eda7c657352ed21040f1664f3ee5` (2026-09-13). Local branch: `local/microsoft-7445165-investigation`.
++
++**Status: build 12 passed client/server Lua, Osiris callbacks and queries, gameplay, new modded save, normal quit/restart and reload.** MCM settings and callbacks also have runtime proof. The original BG3 executable remains unchanged. See the workspace VerificationLedger.json for per-binary evidence and remaining limits.
++
++## Exact target and version policy
++
++Package: `LarianStudiosGamesLtd.baldurssgate3_1.8.907.0_x64__551z37b1dechw`. Executable: `C:\XboxGames\Baldur's Gate 3\Content\bg3.exe`, x64 DX11. Fixed resource version: 4.1.1.39597; SpecialBuild and main-menu build: 7445165.
++
++The official v32 DWrite proxy has already executed in this process, but online release selection rejects the fixed resource version. The prepared test uses the upstream loader's DebugLoadSE development option to load the local BG3ScriptExtender.dll. The runtime still requires the exact package, fixed version, SpecialBuild string and x64 PE header. No false Steam version, entitlement change, executable substitution or alternative injection mechanism is involved.
++
++## Source changes
++
++All engine changes require `BG3SE_MICROSOFT_7445165`. Without it, upstream ABI and version checks remain.
++
++| Source | Change and evidence |
++|---|---|
++| BuildIdentity.h; GameHooks/DataLibraries.h/.cpp | Exact package/build validation and safer resource-allocation failure paths. Unknown builds rejected. |
++| DataLibrariesBG3Game.cpp; Extender/Client/IMGUI/IMGUI.cpp | Identify this exact Microsoft bg3.exe as DX11; live modules and game window confirm it. |
++| GameDefinitions/FileReader.h | Two 32-bit handles match live constructor/destructor instructions. Static assertions: Buffer 0x28, Type 0x80, FileObject 0x88, size 0x90. |
++| GameDefinitions/Symbols.h; DataLibraries.cpp | Adapt Microsoft's one-pointer free wrapper. Require its internal allocator getter to equal the independently mapped allocation getter; mismatch is a critical initialization failure. |
++| Build-MicrosoftMappings.ps1 and generated BinaryMappingsMicrosoft7445165.xml | Five earlier candidate replacements, allocator sequence, App constructor/instance register change, statistics loader short branch. String guards and critical checks retained. |
++| BG3Extender.rc | Embed Microsoft mappings only in opt-in build; original UTF-16 encoding retained. |
++| Directory.Build.targets | Optional MSBuild define; no upstream post-build deployment. |
++| Generate-CMake.py; Build-Microsoft.ps1 | Portable MSVC build derives source lists, includes, release defines and libraries from upstream projects. Generates enums, property maps, protobuf code and Lua bundle. No deployment. |
++
++## Evidence and remaining validation
++
++The read-only live audit resolved all 16 top-level critical mappings plus chained client DoWork, with literal guards and target references checked. Multiple candidate call sites are accepted only if target tuples agree. This is binding evidence, not runtime proof.
++
++The allocator mapping uses independently checked free-wrapper/allocation body guards. The App creation sequence uses R14 instead of R12, retaining its Creating App string guard. StatsShared retains the first 111 upstream bytes and changes the last near JBE to short JBE. Independent lookup through the live fixed-string pool returned PassiveData, satisfying its original guard. The runtime uses patterns, not hardcoded observed RVAs.
++
++Evidence in the parent workspace Logs directory: BG3SE-CriticalReferenceAudit.json, BG3SE-AllocatorContracts.json, BG3SE-AppCreation.json, BG3SE-StatsSharedFunction.json, BG3SE-StatsSharedStringGuard.json, BG3SE-LivePackageIdentity.json and BG3SE-SecondaryPatternAudit.json.
++
++Two noncritical mappings remain unresolved: App::UpdatePaths (custom profile relocation) and ui::DataContextProvider::ExecuteCommandQueues (no active callback consumer found). A startup warning still reports these. No executable version or allocator safety check is disabled to force initialization.
++
++## Portable build
++
++Administrator-based Visual Studio installation did not complete. Microsoft compiler/SDK packages were instead extracted inside the workspace without Windows Installer actions or global security changes:
++
++- MSVC directory 14.51.36231; compiler 19.51.36257.
++- Windows SDK 10.0.26100.0.
++- CMake 4.4.3; Ninja 1.13.2; workspace Python.
++- Upstream dependency revisions: Logs/BG3SE-BuildDependencies.json.
++
++Source/portable-msvc-upstream.py preserves mmozeiko's original downloader. Source/portable-msvc-local.py restricts paths to the workspace, checks archive destinations and Microsoft manifest hashes, extracts SDK MSIs using LessMSI, and retains downloads/staging. It runs no MSI actions, recursive cleanup or system environment changes. Logs: PortableMSVC-retry.log and CMakeNinjaSources.json.
++
++Build with PowerShell 7:
++
++    & 'C:\BG3Build\Source\bg3se\MicrosoftCompatibility\Build-Microsoft.ps1' -Jobs 1
++
++Output: Build/BG3SE-Microsoft/BG3ScriptExtender.dll in the parent workspace. First build log: Logs/BG3SE-MicrosoftBuild-1.log. A successful compilation is not runtime verification.
++
++## Prepared runtime test and rollback
++
++Source/Deploy-ExperimentalSE.ps1 validates the package and official loader hash, then journals/backups the local DLL, proxy and two configuration files. It refuses deployment while BG3 runs. The development loader selects the exact local runtime. Crash uploads and network debuggers are disabled for tests.
++
++Source/SEProbe records client/server Lua startup, session/game-state events, a real LevelGameplayStarted Osiris event, and read-only host entity/stat queries. These executed in the disposable BG3SE Test campaign. The probe does not change story flags or characters.
++
++Restore-BG3-ModSetup.ps1 defaults to dry-run and includes the local runtime DLL in its allowed rollback files. The updated isolated fixture test passed. Changed/newer files and unrelated mods remain protected; live saves and Xbox cloud containers are never overwritten by this workflow.
++
++## Build and input-binding follow-up
++
++The first compilation was intentionally stopped to increase parallelism after closing BG3. The second reached the runtime code and stopped at MSVC C1128 in LuaSharedLibs.cpp. The portable generator now applies /bigobj to the four large Lua units identified by upstream project options; optimized release settings remain. Build continuation is logged in Logs/BG3SE-MicrosoftBuild-3.log. Protobuf generation now skips current outputs to avoid recompiling unrelated code after a small fix.
++
++The Microsoft binary omits keyboard_WhiteBoxing.json but retains keyboard_1.json and controller_WhiteBoxing.json. Both profile-loader functions independently reference input-manager global RVA 0x5BB1D00 and its input-scheme member at +0xF8. The replacement mapping is a unique instruction sequence guarded by the retained controller profile string; no fixed RVA is used at runtime. Evidence: Logs/BG3SE-InputProfileReferences.json, BG3SE-InputControllerFunction.json and BG3SE-InputAndUIPatterns.json. The data-context command-queue mapping remains unresolved; no source consumer currently attaches a callback to that hook.
++
++## Additional bindings audited 2026-09-15
++Six additional mappings were matched against the live Microsoft process, with one unique full-pattern match each (Logs/BG3SE-SixAdditionalBindings.json):
++- Nine-case stats-functor dispatcher uses RSI instead of R14 for the same original argument; all nine relative call targets retained.
++- DealDamage call site swaps RBX/RDI register allocation; stack sources and argument positions are unchanged.
++- DynamicStatsExpressionManager resolves the same global from three independent 1d4 expression call sites; literal guard retained.
++- StatusPrototype::Init now uses the TELEPORT_FALLING (ID 4) call site; live fixed-string lookup verified the guard and callee arguments.
++- InterruptPrototype::Init retains the 0x220 object stride and statistics-object argument; getter/callee disassembly inspected.
++- AiGrid FindPath/FindPathImmediate retain the same two-argument call chain; Microsoft uses a short conditional branch and different result register.
++These mappings resolved at runtime on build 8. This is not a claim of complete ABI coverage.
++
++### Damage event binding (15 September)
++Audited the actual Microsoft DealDamageFunctor::ApplyDamage function. The six arguments and hit-type/damage comparisons identify the call at RVA 0x32E3105 to the 913-byte StatsSystem damage-event function at 0x2F2D560. Stack temporaries moved by 0x10; the StatsSystem local moved to RBP+0x98. The revised full call-site pattern uniquely matches 0x32E30E5; no target offset is hardcoded. Evidence is in BG3SE-ApplyDamageFullAudit.json, BG3SE-ThrowDamageCallee.json, and BG3SE-ThrowDamageMapping.json under the work Logs directory.
++
+diff --git a/MicrosoftCompatibility/Test-OptionalMappings.cpp b/MicrosoftCompatibility/Test-OptionalMappings.cpp
+new file mode 100644
+index 0000000..15f9195
+--- /dev/null
++++ b/MicrosoftCompatibility/Test-OptionalMappings.cpp
+@@ -0,0 +1,23 @@
++#include "OptionalMappings.h"
++
++using bg3se::microsoft::IsOptionalMapping;
++
++// Known unused gaps are optional, but requested functionality is not.
++static_assert(IsOptionalMapping("App::UpdatePaths", false, false));
++static_assert(!IsOptionalMapping("App::UpdatePaths", true, false));
++static_assert(IsOptionalMapping("ui::DataContextProvider::ExecuteCommandQueues", false, false));
++static_assert(IsOptionalMapping("ui::DataContextProvider::ExecuteCommandQueues", true, false));
++
++// A critical declaration always wins, including for an allowlisted name.
++static_assert(!IsOptionalMapping("App::UpdatePaths", false, true));
++static_assert(!IsOptionalMapping("ui::DataContextProvider::ExecuteCommandQueues", false, true));
++
++// New failures, near matches and allocator/save checks must keep failing.
++static_assert(!IsOptionalMapping("App::UpdatePaths2", false, false));
++static_assert(!IsOptionalMapping("App::UpdatePaths ", false, false));
++static_assert(!IsOptionalMapping("App::Ctor", false, false));
++static_assert(!IsOptionalMapping("MicrosoftAllocatorFreeContract", false, true));
++static_assert(!IsOptionalMapping("MicrosoftPC::SkipConsoleSaveClassification", false, true));
++static_assert(!IsOptionalMapping("", false, false));
++
++int main() { return 0; }

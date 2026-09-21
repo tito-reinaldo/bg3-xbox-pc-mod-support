@@ -1,0 +1,218 @@
+diff --git a/MICROSOFT-LOCAL-BUILD.md b/MICROSOFT-LOCAL-BUILD.md
+new file mode 100644
+index 0000000..e8f1afe
+--- /dev/null
++++ b/MICROSOFT-LOCAL-BUILD.md
+@@ -0,0 +1,26 @@
++# Local Microsoft PC configuration and build
++
++Base upstream commit: `fc3535868935c16b7260be0d5749c0d84b2a9b1a` (2025-10-06). The public release remains 1.0.12.9; this is a local source build with that assembly version, not a new official release.
++
++## Changes
++
++- `MainWindowViewModel.cs`: export runs on `RxApp.MainThreadScheduler`. The original task-pool scheduler caused a WPF collection-thread exception after export. The patched export completes, shows its success message, keeps controls enabled, and writes the active Microsoft cached order.
++- `GUI.csproj` and API call sites: SharpCompress upgraded from 0.39.0 to 0.48.0. NuGet reported GHSA-6c8g-7p36-r338 against the old version. Updated encoding, BZip2 stream, archive factory and writer factory calls to the new API.
++- Core/GUI project files: optional `BG3MMReleaseLibraries` property reuses LSLib and CrossSpeak from the official 1.0.12.9 archive. Normal upstream references remain when the property is absent.
++
++No game executable modifications. The directory layout is handled by settings and two junctions in `ManagerView`; the launcher uses the Microsoft package AUMID through Explorer. This avoids Steam launch assumptions.
++
++## Build
++
++Private Microsoft .NET SDK 8.0.425 and Windows Desktop runtime 8.0.31 are under `Tools/DotNet` in the parent modding workspace. Archive hashes and official source URLs are recorded in `Logs/ToolRuntimeSources.json` and `ToolsInventory.json`.
++
++```powershell
++$work = 'C:\BG3Build'
++& "$work\Tools\DotNet\dotnet.exe" build "$work\Source\BG3ModManager\src\GUI\GUI.csproj" -c Release -p:Platform=x64 -p:SolutionDir="$work\Source\BG3ModManager\" -p:BG3MMReleaseLibraries="$work\Tools\BG3ModManager\_Lib" -p:OutputPath="$work\Build\BG3ModManager\" --nologo
++```
++
++Use this build command, not the repository's publishing scripts. Build: zero errors; eight existing warnings. Runtime: active/inactive movement, successful live export and Microsoft package launch verified. Exported XML survived game startup byte-for-byte (`Logs/BG3MM-LiveExport.lsx`, `Logs/BG3MM-AfterLaunch.lsx`).
++
++The log's missing Larian launcher preferences and empty synthetic profile UUID warnings are expected for this directory view. They did not prevent export. Xbox manages the signed-in profile; BG3MM manages only packages and cached order here.
++
++Keep this build until an upstream release incorporates equivalent fixes; a manager auto-update could replace it. Source diff, original binaries, build log and deployed hashes remain in the parent workspace.
+diff --git a/src/Core/DivinityModManagerCore.csproj b/src/Core/DivinityModManagerCore.csproj
+index b0afaa8..13d65e8 100644
+--- a/src/Core/DivinityModManagerCore.csproj
++++ b/src/Core/DivinityModManagerCore.csproj
+@@ -16,11 +16,15 @@
+ 		<DebugType>full</DebugType>
+ 		<Optimize>False</Optimize>
+ 	</PropertyGroup>
+-	<ItemGroup>
+-		<ProjectReference Include="$(SolutionDir)External\lslib\LSLibNative\LSLibNative.vcxproj" />
++	<ItemGroup Condition="'$(BG3MMReleaseLibraries)' == ''">
++		<ProjectReference Include="$(SolutionDir)External\lslib\LSLibNative\LSLibNative.vcxproj" />
+ 		<ProjectReference Include="$(SolutionDir)External\lslib\LSLib\LSLib.csproj" />
+-		<ProjectReference Include="$(SolutionDir)External\CrossSpeak\CrossSpeak\CrossSpeak.csproj" />
+-	</ItemGroup>
++		<ProjectReference Include="$(SolutionDir)External\CrossSpeak\CrossSpeak\CrossSpeak.csproj" />
++	</ItemGroup>
++	<ItemGroup Condition="'$(BG3MMReleaseLibraries)' != ''">
++		<Reference Include="LSLib"><HintPath>$(BG3MMReleaseLibraries)\LSLib.dll</HintPath></Reference>
++		<Reference Include="CrossSpeak"><HintPath>$(BG3MMReleaseLibraries)\CrossSpeak.dll</HintPath></Reference>
++	</ItemGroup>
+ 	<ItemGroup>
+ 		<PackageReference Include="Gameloop.Vdf" Version="0.6.2" />
+ 		<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+@@ -34,4 +38,4 @@
+ 		<PackageReference Include="System.Text.RegularExpressions" Version="4.3.1" />
+ 		<PackageReference Include="System.Net.Http" Version="4.3.4" />
+ 	</ItemGroup>
+-</Project>
+\ No newline at end of file
++</Project>
+diff --git a/src/GUI/GUI.csproj b/src/GUI/GUI.csproj
+index af3450a..33cc813 100644
+--- a/src/GUI/GUI.csproj
++++ b/src/GUI/GUI.csproj
+@@ -41,8 +41,11 @@
+ 	</PropertyGroup>
+ 	
+ 	<ItemGroup>
+-		<ProjectReference Include="$(SolutionDir)\src\Core\DivinityModManagerCore.csproj" />
+-	</ItemGroup>
++		<ProjectReference Include="$(SolutionDir)\src\Core\DivinityModManagerCore.csproj" />
++	</ItemGroup>
++	<ItemGroup Condition="'$(BG3MMReleaseLibraries)' != ''">
++		<Reference Include="LSLib"><HintPath>$(BG3MMReleaseLibraries)\LSLib.dll</HintPath></Reference>
++	</ItemGroup>
+ 	
+ 	<ItemGroup>
+ 		<PackageReference Include="AdonisUI" Version="1.17.1" />
+@@ -59,7 +62,7 @@
+ 		<PackageReference Include="ReactiveUI" Version="20.1.63" />
+ 		<PackageReference Include="ReactiveUI.Fody" Version="19.5.41" />
+ 		<PackageReference Include="ReactiveUI.WPF" Version="20.1.63" />
+-		<PackageReference Include="SharpCompress" Version="0.39.0" />
++		<PackageReference Include="SharpCompress" Version="0.48.0" />
+ 		<PackageReference Include="Splat" Version="15.3.1" />
+ 		<PackageReference Include="Splat.Drawing" Version="15.3.1" />
+ 		<PackageReference Include="System.Reactive" Version="6.0.1" />
+@@ -107,4 +110,4 @@
+ 		</GetAssemblyIdentity>
+ 		<Exec Command="python &quot;BuildRelease.py&quot; &quot;%(AssemblyVersion.Version)&quot;" WorkingDirectory="$(SolutionDir)" />
+ 	</Target>
+-</Project>
+\ No newline at end of file
++</Project>
+diff --git a/src/GUI/ViewModels/MainWindowViewModel.cs b/src/GUI/ViewModels/MainWindowViewModel.cs
+index d507c2b..d76e1ac 100644
+--- a/src/GUI/ViewModels/MainWindowViewModel.cs
++++ b/src/GUI/ViewModels/MainWindowViewModel.cs
+@@ -562,6 +562,36 @@ Directory the zip will be extracted to:
+ 
+ 	public bool CheckExtenderInstalledVersion(CancellationToken? t)
+ 	{
++		// The official updater's DebugLoadSE mode loads a runtime beside the
++		// game executable, rather than from the normal downloaded-version cache.
++		// Read the actual loader configuration; don't infer runtime execution.
++		try
++		{
++			var gameDirectory = Path.GetDirectoryName(Settings.GameExecutablePath);
++			if (!String.IsNullOrEmpty(gameDirectory))
++			{
++				var loaderConfig = Path.Combine(gameDirectory, "ScriptExtenderUpdaterConfig.json");
++				var localRuntime = Path.Combine(gameDirectory, DivinityApp.EXTENDER_APPDATA_DLL);
++				if (File.Exists(loaderConfig) && File.Exists(localRuntime)
++					&& JObject.Parse(File.ReadAllText(loaderConfig))["DebugLoadSE"]?.Value<bool>() == true)
++				{
++					var localInfo = FileVersionInfo.GetVersionInfo(localRuntime);
++					if (localInfo.FileMajorPart > 0
++						&& localInfo.ProductName?.Contains("Script Extender", StringComparison.OrdinalIgnoreCase) == true)
++					{
++						Settings.ExtenderSettings.ExtenderIsAvailable = true;
++						Settings.ExtenderSettings.ExtenderMajorVersion = localInfo.FileMajorPart;
++						Settings.ExtenderSettings.ExtenderVersion = localInfo.FileVersion;
++						DivinityApp.Log($"Local development Script Extender file found: {localRuntime} ({localInfo.FileVersion}); execution is not verified by this check.");
++						return true;
++					}
++				}
++			}
++		}
++		catch (Exception ex)
++		{
++			DivinityApp.Log($"Unable to inspect local development Script Extender: {ex.Message}");
++		}
+ 		var appDataDirectory = GetLarianStudiosAppDataFolder();
+ 		string extenderAppDataDir = "";
+ 		if (Directory.GetParent(appDataDirectory) is DirectoryInfo localAppDataDir)
+@@ -836,18 +866,18 @@ Directory the zip will be extracted to:
+ 
+ 	private void WriteInsanityCheck()
+ 	{
++		// A request may have been queued before saved settings were loaded.
++		if (!Settings.DeleteModCrashSanityCheck) return;
+ 		Settings.ExtenderSettings.InsanityCheck = true;
+ 		var gameExeDirectory = Path.GetDirectoryName(Settings.GameExecutablePath.ToRealPath());
+ 		var outputFile = Path.Join(gameExeDirectory, DivinityApp.EXTENDER_CONFIG_FILE);
+ 		try
+ 		{
+-			JsonSerializerSettings exportSettings = new()
+-			{
+-				DefaultValueHandling = Settings.ExtenderSettings.ExportDefaultExtenderSettings ? DefaultValueHandling.Include : DefaultValueHandling.Ignore,
+-				NullValueHandling = NullValueHandling.Ignore,
+-				Formatting = Formatting.Indented
+-			};
+-			var contents = JsonConvert.SerializeObject(Settings.ExtenderSettings, exportSettings);
++			// This automatic action owns one setting. Preserve the user's runtime
++			// diagnostics and options that the manager's model does not yet know.
++			var config = File.Exists(outputFile) ? JObject.Parse(File.ReadAllText(outputFile)) : new JObject();
++			config["InsanityCheck"] = true;
++			var contents = config.ToString(Formatting.Indented);
+ 			File.WriteAllText(outputFile, contents);
+ 		}
+ 		catch (Exception ex)
+@@ -2840,7 +2870,9 @@ Directory the zip will be extracted to:
+ 
+ 	private void ExportLoadOrder()
+ 	{
+-		RxApp.TaskpoolScheduler.ScheduleAsync(async (ctrl, t) =>
++		// Export updates WPF-bound order collections before and after asynchronous I/O.
++		// Keep those continuations on the dispatcher so repeated exports remain usable.
++		RxApp.MainThreadScheduler.ScheduleAsync(async (ctrl, t) =>
+ 		{
+ 			await ExportLoadOrderAsync();
+ 			return Disposable.Empty;
+@@ -3034,7 +3066,7 @@ Directory the zip will be extracted to:
+ 		}
+ 	}
+ 
+-	private static readonly ArchiveEncoding _archiveEncoding = new(Encoding.UTF8, Encoding.UTF8);
++	private static readonly ArchiveEncoding _archiveEncoding = new() { Default = Encoding.UTF8, Password = Encoding.UTF8 };
+ 	private static readonly ReaderOptions _importReaderOptions = new() { ArchiveEncoding = _archiveEncoding };
+ 	private static readonly WriterOptions _exportWriterOptions = new(CompressionType.Deflate) { ArchiveEncoding = _archiveEncoding };
+ 
+@@ -3260,7 +3292,7 @@ Directory the zip will be extracted to:
+ 					switch (extension)
+ 					{
+ 						case ".bz2":
+-							decompressionStream = new BZip2Stream(fileStream, SharpCompress.Compressors.CompressionMode.Decompress, true);
++							decompressionStream = BZip2Stream.Create(fileStream, SharpCompress.Compressors.CompressionMode.Decompress, true);
+ 							break;
+ 						case ".xz":
+ 							decompressionStream = new XZStream(fileStream);
+@@ -3412,7 +3444,7 @@ Directory the zip will be extracted to:
+ 				await fileStream.ReadAsync(new byte[fileStream.Length], 0, (int)fileStream.Length);
+ 				fileStream.Position = 0;
+ 				IncreaseMainProgressValue(taskStepAmount);
+-				using (var archive = ArchiveFactory.Open(fileStream, _importReaderOptions))
++				using (var archive = ArchiveFactory.OpenArchive(fileStream, _importReaderOptions))
+ 				{
+ 					foreach (var file in archive.Entries)
+ 					{
+@@ -3577,7 +3609,7 @@ Directory the zip will be extracted to:
+ 			try
+ 			{
+ 				using (var stream = File.OpenWrite(outputPath))
+-				using (var zipWriter = WriterFactory.Open(stream, ArchiveType.Zip, _exportWriterOptions))
++				using (var zipWriter = WriterFactory.OpenWriter(stream, ArchiveType.Zip, _exportWriterOptions))
+ 				{
+ 					var orderFileName = DivinityModDataLoader.MakeSafeFilename(Path.Combine(SelectedModOrder.Name + ".json"), '_');
+ 					var contents = JsonConvert.SerializeObject(SelectedModOrder, Newtonsoft.Json.Formatting.Indented);
+@@ -5446,4 +5478,4 @@ Directory the zip will be extracted to:
+ 			}
+ 		});
+ 	}
+-}
+\ No newline at end of file
++}

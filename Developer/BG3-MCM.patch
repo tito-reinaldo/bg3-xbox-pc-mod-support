@@ -1,0 +1,42 @@
+diff --git a/Mod Configuration Menu/Mods/BG3MCM/ScriptExtender/Lua/Client/Helpers/Noesis.lua b/Mod Configuration Menu/Mods/BG3MCM/ScriptExtender/Lua/Client/Helpers/Noesis.lua
+index 71b9158..7baaf73 100644
+--- a/Mod Configuration Menu/Mods/BG3MCM/ScriptExtender/Lua/Client/Helpers/Noesis.lua	
++++ b/Mod Configuration Menu/Mods/BG3MCM/ScriptExtender/Lua/Client/Helpers/Noesis.lua	
+@@ -196,6 +196,7 @@ function Noesis:MonitorMCMGameMenuButtonPress(isController)
+             IMGUIAPI:ToggleMCMWindow(false)
+         end)
+         MCMButton.DataContext = ctx
++        Ext.Utils.Print("[MCM local] GAME_MENU_BOUND " .. tostring(ctx.Type))
+ 
+         -- Kept for troubleshooting purposes (shows warning)
+         Noesis:HandleGameMenuMCMButtonPress(MCMButton)
+@@ -241,3 +242,29 @@ function Noesis:MonitorMainMenuButtonPress()
+         return mainMenuButton ~= nil
+     end, 2000, function() return not MCMProxy:IsMainMenu() end)
+ end
++
++-- The menu can also be opened with the HUD mouse button, which sends neither
++-- ESCAPE nor controller START. Bind its MCM command when that menu appears.
++-- Re-query the current widget instead of retaining a reference across closes.
++local menuPollTicks, menuPollFailed = 0, false
++Ext.Events.Tick:Subscribe(function()
++    if menuPollFailed then return end
++    menuPollTicks = menuPollTicks + 1
++    if menuPollTicks % 30 ~= 0 or MCMProxy.IsMainMenu() then return end
++    local ok, err = pcall(function()
++        for _, controller in ipairs({ false, true }) do
++            local button = Noesis:FindMCMGameMenuButton(controller)
++            if button then
++                local ctx = button.DataContext
++                if not ctx or not tostring(ctx.Type):match("GameMenuMCMButtonDC$") then
++                    Noesis:MonitorMCMGameMenuButtonPress(controller)
++                end
++                break
++            end
++        end
++    end)
++    if not ok then
++        menuPollFailed = true
++        MCMWarn(0, "Mouse-opened game menu binding failed: %s", tostring(err))
++    end
++end)
