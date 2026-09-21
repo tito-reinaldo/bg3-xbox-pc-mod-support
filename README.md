@@ -1,101 +1,45 @@
-# Download the complete release ZIP
+# BG3 Xbox Mod Manager
 
-Use [GitHub Releases](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/releases) or [Nexus Mods](https://www.nexusmods.com/baldursgate3/mods/25195). The GitHub Code ZIP contains installer sources and patches, not the binary payload. Full corresponding component source is inside the complete release download. See BUILDING.md.
+**Experimental 0.2.0 · Xbox PC / Microsoft Store · package 1.8.907.0 only**
 
-# BG3 Xbox PC / Microsoft Store Mod Support
+[Download the player ZIP](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.0). Choose **BG3-Xbox-Mod-Manager-0.2.0.zip**. The separately labelled source archive is for developers.
 
-**Experimental release 0.1.0 — Windows PC only.** This community compatibility package enables a local Script Extender v33 port and configures a patched BG3 Mod Manager for the Xbox app / Microsoft Store edition of Baldur's Gate 3.
-
-**Supported target: Microsoft package 1.8.907.0, engine build 4.1.1.7445165, x64 DX11.** It is not for Xbox consoles, Steam, GOG, cloud gaming, or other game builds. It is not an official release by Larian, Microsoft, Norbyte, LaughingLeader, or Volitio. Individual mods can still be incompatible.
-
-- Project, source and issue reports: https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support
-- Nexus download: https://www.nexusmods.com/baldursgate3/mods/25195
+An unofficial Xbox compatibility build of BG3 Mod Manager, with a **Set up** button that installs the compatible Script Extender and optional Mod Configuration Menu (MCM).
 
 ## Install
 
-1. Install and launch the Xbox PC / Microsoft Store game normally at least once. Sign into the Xbox profile you intend to use and open the in-game Mod Manager. Quit normally after the game has created its mod cache.
-2. Download the **complete 0.1.0 ZIP**, and use **Extract All** into a permanent, writable folder such as `C:\Games\BG3-Xbox-Mod-Support`. Do not extract into WindowsApps or the game folder. Keep all subfolders together. This is a manual installation; do not send this ZIP to Vortex or import the whole ZIP as a PAK mod.
-3. Save and close BG3 and any running BG3 Mod Manager. Double-click **Check.cmd** for read-only package, path and payload checks.
-4. Double-click **Install.cmd**. The installer detects the registered Microsoft package, locates the XboxGames Content folder, finds your cached mod profile, and backs up the four files it changes. It leaves the game executable, installed PAKs, load order and saves intact. No administrator or WindowsApps ownership change is required.
-5. Double-click **Start Mod Manager.cmd**. Use **Profile: XboxPC**, **Campaign: Main**. Import each mod from its author, read its requirements, and move it from Inactive to Active. Put dependencies before dependent mods and follow the author's order for conflict patches.
-6. Choose **Save Order As** to retain a named order, then **Export Order to Game**. Saving the named order alone does not activate mods. Preserve official/catalogue mods you want when exporting the order.
-7. Launch from the Xbox app, your normal Xbox shortcut, or the configured manager Launch Game button. Check the main menu for **Script Extender v33 loaded**. Try new mods in a disposable campaign and test save/reload before committing to a long playthrough.
+1. Launch BG3 once through Xbox, open its in-game Mod Manager, then quit.
+2. Extract the full player ZIP into a writable folder outside the game.
+3. Open **BG3 Xbox Mod Manager.exe** and click **Set up**. Leave MCM checked to include it.
+4. Launch BG3 normally. Look for **Script Extender v33 loaded** and **Mod Configuration Menu** in the main menu.
 
-The package includes a private Microsoft .NET 8.0.31 desktop runtime for the manager. It does not install .NET globally. The command launchers use Windows PowerShell only for this operation; they do not change your persistent execution policy.
+Keep the App folder beside the program. No commands, manual JSON editing or global .NET installation are needed. If detection needs help, select the game's Content folder using the folder picker. Find that folder through Xbox > Manage > Files > Browse. For multiple cached profiles, choose the intended profile in the manager.
 
-### Custom game folder or multiple Xbox profiles
+Close BG3 before importing mods or exporting an order. Use **File > Import Mod**, move the desired mods to Active, and **Export Order to Game**. Preserve all other mods you want active and follow each author's dependency/load-order instructions. Launch through Xbox or the manager's Launch Game button.
 
-If automatic detection cannot choose a folder, open PowerShell in the extracted release folder and run:
+## What is included
 
-```powershell
-.\Install.ps1 -GameDirectory "D:\XboxGames\Baldur's Gate 3\Content"
-```
+The player download contains only the launcher, application/runtime files, compatible SE/MCM payloads, required notices and a short guide. No developer source, scripts, reports, logs, saves or diagnostic mods. It is a portable utility; extract it manually rather than importing its ZIP into Vortex or the in-game mod browser.
 
-Use Xbox **Manage > Files > Browse** to find the folder containing `bg3.exe` and `MicrosoftGame.config`. If more than one cached profile exists, add `-ProfileDirectory` with the full path to the intended folder containing `modsettings.lsx` under:
+Setup detects the supported game and cached Xbox profile directly, backs up all changed files and preserves existing settings and other mods. MCM is selected by default and can be unchecked. Undo is under **Xbox PC > Undo setup** and refuses to overwrite later changes. Exporting a mod order also creates a backup. Keep the extracted app folder because it holds those backups.
 
-```text
-%LOCALAPPDATA%\Packages\LarianStudiosGamesLtd.baldurssgate3_551z37b1dechw\LocalCache\Local\Mods
-```
+## Compatibility and testing
 
-No cached profile found? Start the game using the intended Xbox account, open Mod Manager and quit normally, then retry. Do not invent a profile ID or point the manager at Xbox cloud-save containers.
+Supports **LarianStudiosGamesLtd.baldurssgate3 1.8.907.0**, game build **4.1.1.7445165**, on Windows x64. This is not for Xbox consoles, cloud gaming, Steam or GOG. Other versions are rejected; a game update needs a newly tested compatibility release.
 
-### Optional Mod Configuration Menu
+0.2.0 passed 19 automated setup/rollback fixture checks. The packaged GUI was tested on the Xbox installation: reading the existing mods/profile, blocking setup while the game ran, installation with six verified files, preserving the ordered mod IDs and every other PAK, exact restoration of all 21 tracked originals, and export with an exact pre-export backup. Native SE and MCM binaries are unchanged from the earlier tested port.
 
-`OptionalMods\BG3MCM.pak` is an optional, modified **MCM 1.41.0.0** from Volitio/AtilioA, with a mouse-menu compatibility fix and package priority 30. Import this PAK into the supplied manager, activate it, place it before MCM-dependent mods, and export. Do not install it alongside a second MCM PAK with the same UUID. Keep a copy of any existing MCM package before replacing it.
+The native port has shown Script Extender v33 and opened MCM on this Xbox build. Earlier September 15 testing covered Lua/Osiris, gameplay and a modded save/reload. The later exact native DLL included here passed startup/client checks, but that complete campaign/save/reload test was not repeated on this exact DLL. Every mod/API, multiplayer, achievements and long-session stability are not established. An earlier launch hang/crash report has no confirmed cause. Custom profile relocation is unsupported. Keep pre-mod saves and test new mods in a disposable campaign.
 
-Open **Mod Configuration Menu** from BG3's main menu or the in-game menu. Its presence in the official Installed list is not a reliable indicator of activation. This modified MCM is distributed under AGPLv3; its full corresponding source, font/library notices and build helper are included. It is not a new official MCM version. MCM is optional; the installer does not automatically install or activate it.
-
-## What changes
-
-The installer writes only these native/configuration files beside `bg3.exe`:
-
-- `DWrite.dll`: Norbyte's unmodified upstream v32 loader.
-- `BG3ScriptExtender.dll`: the local v33 Microsoft compatibility port.
-- `ScriptExtenderUpdaterConfig.json`: selects the loader's local development runtime and disables ordinary runtime updates.
-- `ScriptExtenderSettings.json`: preserves existing options and hides the debug console; supplies conservative defaults for a new configuration.
-
-Original files and their hashes are retained in `InstallationState`. Manager settings, named orders and two directory junctions are created inside this extracted release folder. The junctions connect the manager to the game's real mod cache. The installer copies your existing load order into InstallationState for reference but never overwrites it. It does not change achievements/launcher options in an existing configuration; a new configuration leaves the achievement override disabled. No title-bar helper or personal graphics changes are included.
-
-**Keep this folder in its installed location. Do not recursively delete the contents of ManagerView: its junctions lead into your real mod cache.**
-
-## Tested behavior and limits
-
-- September 15 native build: client/server Lua, Osiris callbacks and queries, gameplay, creating a modded save, normal quit/restart, and loading that save passed in a disposable campaign.
-- MCM mouse-menu build: main/in-game menu access and a harmless test setting's saved value and callbacks were verified.
-- September 19 native DLL included here: isolated startup and client initialization passed after correcting the handling of two audited optional mappings. The earlier full campaign/save/reload test was **not repeated on this exact DLL**.
-- September 21: the running Xbox PC game showed Script Extender v33 and opened MCM through the main menu. Included screenshots document that observation. This is not a full campaign regression test.
-- Mod manager: the patched export and Microsoft package launch were verified locally. Release packaging and installer rollback tests are described in `VALIDATION.md`.
-
-The runtime retains exact package, fixed resource version (4.1.1.39597), SpecialBuild (7445165), architecture and critical mapping guards. The installer checks the registered package and readable Microsoft game configuration; GDK can block external reads of the protected executable. The runtime performs its additional checks inside the game.
-
-Unresolved optional bindings: custom profile relocation (`App::UpdatePaths`) and an unused data-context command-queue callback. Custom profile relocation is unsupported. Other missing critical bindings are still errors. Complete engine ABI coverage, every SE API, every mod, multiplayer/cross-play, achievements and long-session stability are not established. A hang was reported during earlier use; a subsequent launch worked, and its cause was not established. Use a test campaign and keep pre-mod saves.
-
-## Updating and troubleshooting
-
-- **Do not use the manager's Download/Update Script Extender command or replace the two SE JSON files with generic instructions.** The normal upstream download does not contain this experimental port. Keep `DebugLoadSE: true` and `DisableUpdates: true` in the updater configuration.
-- Do not accept a manager auto-update over this portable patched copy until an equivalent compatibility fix is available.
-- A future game/package update requires a new audited release. This installer rejects other package versions; the runtime also rejects other builds. Do not weaken those checks to force it to load.
-- If an imported mod does not activate, check its dependencies, export the intended order, inspect the in-game Installed tab, and restart after enabling it there if offered. After official catalogue updates, refresh the external manager and re-export the full intended order.
-- The debug console is hidden by default. For a useful bug report, enable `CreateConsole` or `LogRuntime` temporarily in your own SE settings. Remove user paths/account identifiers and other personal information from logs before sharing.
-- Report the package/game version, release number, a minimal mod list, steps to reproduce, and whether it happens with only this port. Do not attach game executables, saves or raw memory dumps.
-
-## Uninstall / rollback
-
-First remove or disable mods according to their authors' instructions and use an appropriate pre-mod save. Removing Script Extender does not make a mod-dependent save vanilla again.
-
-1. Save and close BG3 and BG3 Mod Manager.
-2. Run **Uninstall-preview.cmd** to see what would change.
-3. In PowerShell in this release folder, run ` .\Uninstall.ps1 -Apply ` to restore tracked originals or remove files that this installer added.
-
-Rollback checks hashes and preserves anything changed since installation. Conflicts are reported for manual comparison with the backups; it does not overwrite newer files. It leaves PAKs, orders, saves, manager files and junctions intact. Keep InstallationState for recovery. To reinstall, roll back the prior installation first and extract a fresh release into a new permanent folder.
+This is a local experimental runtime. Standard SE/manager automatic updates are disabled in this copy so they cannot replace the Xbox build. The debug console is hidden by default. Setup never replaces the game executable or changes Xbox save containers.
 
 ## Credits and source
 
-Compatibility integration and release: **tito-reinaldo / titoreinaldo**, developed with AI coding assistance. The underlying tools are the work of their respective authors:
+- [Norbyte's Script Extender](https://github.com/Norbyte/bg3se): MIT with Commons Clause.
+- [LaughingLeader's BG3 Mod Manager](https://github.com/LaughingLeader/BG3ModManager): MIT; modified app keeps upstream assembly version 1.0.12.9.
+- [Volitio/AtilioA's MCM](https://github.com/AtilioA/BG3-MCM): AGPLv3 and component/font notices.
+- Xbox compatibility integration and packaging: tito-reinaldo, with AI coding assistance.
 
-- [Norbyte's BG3 Script Extender](https://github.com/Norbyte/bg3se): MIT **with the Commons Clause no-sale condition**. Preserve both notices. Free distribution; no paid access or support sold for this port.
-- [LaughingLeader's BG3 Mod Manager](https://github.com/LaughingLeader/BG3ModManager): MIT. This is a modified build retaining the upstream assembly version 1.0.12.9.
-- [Volitio/AtilioA's Mod Configuration Menu](https://github.com/AtilioA/BG3-MCM): AGPLv3, with its included font/library licenses.
-- Microsoft and the other dependency authors: see `Runtime\LICENSE.txt`, `Runtime\ThirdPartyNotices.txt`, `Licenses`, and the notices in `Source`.
+This is not an official release or endorsement by those authors, Larian or Microsoft. Free distribution; no Donation Points. Required notices are in **App/THIRD PARTY NOTICES.txt**. Full corresponding sources, dependency revisions and build instructions are in **BG3-Xbox-PC-Corresponding-Source-0.2.0.zip**, a separate release asset. Do not use GitHub's automatically generated Code ZIP as the player download.
 
-The included `Source` tree contains the three corresponding project sources; `Developer` includes upstream-relative patches, revision/dependency records and MCM build helpers. See `BUILDING.md`. The original installer/docs are MIT-licensed. This collection does not replace component licenses or imply endorsement from upstream authors. No game executable or game data files are distributed.
+The old 0.1.0 Nexus listing was deleted at the uploader's request. The scripts retained in this repository root describe that historical installer; use the 0.2.0 release and its corresponding-source archive for the current application. Scanner results and download availability are determined by the hosting service; this project cannot guarantee automatic approval.
