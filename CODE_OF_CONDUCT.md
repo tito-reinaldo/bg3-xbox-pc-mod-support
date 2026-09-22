@@ -11,7 +11,7 @@ These rules apply to this repository's issues, pull requests, and other project 
 
 ## Reporting and moderation
 
-For an ordinary moderation problem, tag @tito-reinaldo in the affected discussion without repeating abusive content. Use GitHub's **Report content** option for harassment, threats, or exposed private information.
+For an ordinary moderation problem, tag @titoreinaldo in the affected discussion without repeating abusive content. Use GitHub's **Report content** option for harassment, threats, or exposed private information.
 
 The maintainer may ask for changes, remove inappropriate content, lock a discussion, or block repeated or serious abuse. Decisions should be proportionate and applied consistently. Reports made in good faith must not lead to retaliation.
 

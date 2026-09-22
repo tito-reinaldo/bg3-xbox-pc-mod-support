@@ -2,7 +2,7 @@
 
 ## Report a vulnerability privately
 
-Use [Report a vulnerability](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/security/advisories/new) to contact this repository's maintainers privately. A GitHub account is required.
+Use [Report a vulnerability](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/security/advisories/new) to contact this repository's maintainers privately. A GitHub account is required.
 
 Include:
 - The package version and affected component.

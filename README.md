@@ -55,8 +55,8 @@ SE v33 and MCM have loaded on this Xbox build. Earlier testing included Lua/Osir
 This is not an official release or endorsement by those authors, Larian or Microsoft. Free distribution; no Donation Points. Required notices remain in App/THIRD PARTY NOTICES.txt.
 
 
-[Full corresponding source and build instructions](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2) are a separate developer archive. That release provides source and checksums only, not a player download. GitHub’s automatic Code/tag archives are not the complete corresponding source. The historical installer scripts in this repository root are from 0.1.0 and are not the current installation method.
+[Full corresponding source and build instructions](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2) are a separate developer archive. That release provides source and checksums only, not a player download. GitHub’s automatic Code/tag archives are not the complete corresponding source. The historical installer scripts in this repository root are from 0.1.0 and are not the current installation method.
 
 ## Reports and contributions
 
-Use the [bug report form](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/issues/new/choose) for problems and [CONTRIBUTING.md](CONTRIBUTING.md) for proposed fixes. Report security vulnerabilities privately through the route in [SECURITY.md](SECURITY.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
+Use the [bug report form](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/issues/new/choose) for problems and [CONTRIBUTING.md](CONTRIBUTING.md) for proposed fixes. Report security vulnerabilities privately through the route in [SECURITY.md](SECURITY.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
