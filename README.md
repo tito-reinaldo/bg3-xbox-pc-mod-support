@@ -1,10 +1,10 @@
 # BG3 Mod Support for the Xbox App on PC
 
 
-**Experimental package 0.2.1 · Xbox PC / Microsoft Store package 1.8.907.0 only**
+**Experimental package 0.2.2 · Xbox PC / Microsoft Store package 1.8.907.0 only**
 
 
-**Player downloads are hosted on Nexus Mods and are subject to its scanning and moderation.** Version 0.2.0 was quarantined after antivirus detections on its outer launcher. Package 0.2.1 removes that unnecessary launcher completely and has been submitted on the [Nexus page](https://www.nexusmods.com/baldursgate3/mods/25204). Do not use 0.2.0 or bypass security warnings.
+**Player downloads are hosted on Nexus Mods and are subject to its scanning and moderation.** Version 0.2.0 was quarantined after antivirus detections on its outer launcher. Package 0.2.1 removed that unnecessary launcher completely. Package 0.2.2 adds the full AGPLv3 license and copyright notices and has been submitted on the [Nexus page](https://www.nexusmods.com/baldursgate3/mods/25204). Do not use 0.2.0 or bypass security warnings.
 
 
 ## What it does
@@ -31,7 +31,7 @@ To add other mods, close BG3, use **File > Import Mod**, move the desired mods t
 ## Testing and limitations
 
 
-Package 0.2.1 only removes the outer launcher and updates the short guide. All remaining application and mod binaries are byte-for-byte unchanged from 0.2.0; the app title still identifies manager build 0.2.0. Direct launch was verified with the Xbox profile and existing mods.
+Package 0.2.1 removed the outer launcher and updated the short guide. Package 0.2.2 changes licensing and documentation only; its application and mod files are identical to 0.2.1. All remaining application and mod binaries are byte-for-byte unchanged from 0.2.0; the app title still identifies manager build 0.2.0. Direct launch was verified with the Xbox profile and existing mods.
 
 
 The unchanged manager passed 19 setup/restore fixture checks and live GUI checks for detection, reading mods, blocking setup while BG3 ran, installation, exact restoration of 21 tracked originals, preserving other mods and ordered IDs, export backups and Xbox launch.
@@ -55,5 +55,8 @@ SE v33 and MCM have loaded on this Xbox build. Earlier testing included Lua/Osir
 This is not an official release or endorsement by those authors, Larian or Microsoft. Free distribution; no Donation Points. Required notices remain in App/THIRD PARTY NOTICES.txt.
 
 
-[Full corresponding source and build instructions](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.1) are a separate developer archive. That release provides source and checksums only, not a player download. GitHub’s automatic Code/tag archives are not the complete corresponding source. The historical installer scripts in this repository root are from 0.1.0 and are not the current installation method.
+[Full corresponding source and build instructions](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2) are a separate developer archive. That release provides source and checksums only, not a player download. GitHub’s automatic Code/tag archives are not the complete corresponding source. The historical installer scripts in this repository root are from 0.1.0 and are not the current installation method.
 
+## Reports and contributions
+
+Use the [bug report form](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/issues/new/choose) for problems and [CONTRIBUTING.md](CONTRIBUTING.md) for proposed fixes. Report security vulnerabilities privately through the route in [SECURITY.md](SECURITY.md). Please follow the [code of conduct](CODE_OF_CONDUCT.md).
