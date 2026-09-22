@@ -14,7 +14,7 @@ Report security problems privately as explained in [SECURITY.md](SECURITY.md).
 
 Keep each pull request focused on one problem. Explain the current behavior, your change, and what you checked. Open an issue before starting a large redesign.
 
-The complete component sources are in **BG3-Xbox-PC-Corresponding-Source-0.2.2.zip** on the [0.2.2 source release](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2). Read that archive's BUILDING.md for build and test instructions. The repository's historical installer scripts and GitHub's automatic source archives are not the complete current component sources.
+The complete component sources are in **BG3-Xbox-PC-Corresponding-Source-0.2.2.zip** on the [0.2.2 source release](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2). Read that archive's BUILDING.md for build and test instructions. This repository checkout and GitHub's automatic source archives are not the complete current component sources. The former installer remains in the v0.1.0 history.
 
 For code that exists only in the source archive, include a text patch under Developer/ in your pull request. State the source archive version, affected component, paths relative to that component, and commands needed to apply and test the patch. Documentation and existing repository files can be edited directly.
 

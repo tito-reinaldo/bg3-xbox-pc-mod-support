@@ -1,3 +1,5 @@
+> Historical record for withdrawn package 0.1.0. The original evidence below is preserved; it does not validate the current package. The matching installer and tests remain in the [v0.1.0 Git history](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/tree/v0.1.0). For current build and test instructions, see [BUILDING.md](../../BUILDING.md).
+
 # Release 0.1.0 validation — 21 September 2026
 
 ## Release packaging

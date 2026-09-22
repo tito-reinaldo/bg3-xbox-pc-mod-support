@@ -55,7 +55,7 @@ SE v33 and MCM have loaded on this Xbox build. Earlier testing included Lua/Osir
 This is not an official release or endorsement by those authors, Larian or Microsoft. Free distribution; no Donation Points. Required notices remain in App/THIRD PARTY NOTICES.txt.
 
 
-[Full corresponding source and build instructions](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2) are a separate developer archive. That release provides source and checksums only, not a player download. GitHub’s automatic Code/tag archives are not the complete corresponding source. The historical installer scripts in this repository root are from 0.1.0 and are not the current installation method.
+[Full corresponding source and build instructions](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/releases/tag/v0.2.2) are a separate developer archive. That release provides source and checksums only, not a player download. GitHub’s automatic Code/tag archives are not the complete corresponding source. The withdrawn 0.1.0 installer and its tests remain in the [v0.1.0 history](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/tree/v0.1.0). Its [validation record](Developer/Historical/VALIDATION-0.1.0.md) is preserved as historical evidence. See [BUILDING.md](BUILDING.md) for the current source archive and build instructions.
 
 ## Reports and contributions
 
