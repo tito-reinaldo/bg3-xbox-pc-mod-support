@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         This project is for BG3 on Windows PC through the Xbox app or Microsoft Store.
-        Search existing issues first. For a security vulnerability, use [private reporting](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/security/advisories/new).
+        Search existing issues first. For a security vulnerability, use [private reporting](https://github.com/titoreinaldo/bg3-xbox-pc-mod-support/security/advisories/new).
         Write "unknown" if you cannot find a version.
   - type: input
     id: package_version
