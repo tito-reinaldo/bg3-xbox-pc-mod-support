@@ -1,0 +1,63 @@
+name: Report a bug
+description: Report a setup, mod-loading, or gameplay problem with the Xbox app PC package.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This project is for BG3 on Windows PC through the Xbox app or Microsoft Store.
+        Search existing issues first. For a security vulnerability, use [private reporting](https://github.com/tito-reinaldo/bg3-xbox-pc-mod-support/security/advisories/new).
+        Write "unknown" if you cannot find a version.
+  - type: input
+    id: package_version
+    attributes:
+      label: Mod support package version
+      description: Use the downloaded ZIP version. The manager window may show an older build number.
+      placeholder: "For example, 0.2.2"
+    validations:
+      required: true
+  - type: input
+    id: game_version
+    attributes:
+      label: BG3 and Microsoft Store package versions
+      description: Include both if available.
+      placeholder: "For example, BG3 4.1.1.7445165; Microsoft package 1.8.907.0"
+    validations:
+      required: true
+  - type: input
+    id: windows_version
+    attributes:
+      label: Windows version
+      placeholder: "For example, Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Explain the problem and what you expected instead. Include any exact error message.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: List the steps and whether the problem happens every time.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Mods and load order
+      description: List active mods in order, with versions when available. Include MCM if installed. Write "none" if no mods are installed.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Screenshots or relevant log excerpts
+      description: Optional. Remove usernames, account IDs, tokens, and personal paths. Do not attach saves or crash dumps containing private data.
